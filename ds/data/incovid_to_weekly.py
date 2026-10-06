@@ -5,9 +5,11 @@ FAIL-CLOSED: requires ds/data/raw/districts.csv (download from
 https://data.incovid19.org/csv/latest/districts.csv — open, no auth).
 
 Schema note: incovid Confirmed/Recovered/Deceased are CUMULATIVE. This script:
-  1. sorts by district+date,
-  2. diffs to daily new cases (negative corrections clipped to 0),
-  3. aggregates to ISO weeks,
+  1. sorts by district+date (dropping 68 exact-duplicate rows present in the file),
+  2. diffs to daily new cases (negative corrections clipped to 0;
+     each district's first observation has no predecessor, so week 1
+     slightly undercounts — negligible over a ~170-week series),
+  3. aggregates to Sunday-ending weeks (W-SUN, CDC epi-week style),
   4. writes ds/data/raw/district_weekly_cases.csv
      (district,week,case_count,disease) for train_outbreak.py.
 
@@ -29,6 +31,7 @@ def main():
             "No synthetic outbreak data is used in this repo."
         )
     df = pd.read_csv(SRC, parse_dates=["Date"])
+    df = df.drop_duplicates()  # file contains exact-duplicate rows (verified: 68)
     df = df.sort_values(["State", "District", "Date"])
     df["new_cases"] = df.groupby(["State", "District"])["Confirmed"].diff()
     df["new_cases"] = df["new_cases"].clip(lower=0)

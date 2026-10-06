@@ -21,6 +21,7 @@ missing. Raw files are gitignored; derived artifacts in `ds/models/` are committ
 | File | `salesmonthly.csv` (2014–2019 monthly, ATC columns M01AB…R06) |
 | Place here | `ds/data/raw/salesmonthly.csv` |
 | Access | **Manual download — Kaggle login required** |
+| No-login mirror (used here) | `mcallara/pharma-sales-data` (`salesmonthly.csv`, 6,908 bytes, blob `851bcec`). Mirror README restates CC BY-NC 4.0 + Kaggle attribution — license chain verified 2026-10-07 |
 | License | **CC BY-NC 4.0** (Milan Zdravković) — attribution in `docs/citations.md`; non-commercial use only |
 
 ## 3. F3 outbreak — machine-readable district timeseries
