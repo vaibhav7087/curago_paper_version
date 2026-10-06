@@ -66,7 +66,10 @@ def main():
     fig, axes = plt.subplots(4, 2, figsize=(16, 20))
     axes = axes.flatten()
     for idx, drug in enumerate(DRUGS):
-        series = df.set_index("date")[drug].dropna().asfreq("MS")
+        series = df.set_index("date")[drug].dropna()
+        # dates are month-end — infer, don't force "MS" (which inserts NaN)
+        freq = pd.infer_freq(series.index) or "ME"
+        series = series.asfreq(freq)
         train, test = series[:-12], series[-12:]
 
         naive_pred = train[-12:].values

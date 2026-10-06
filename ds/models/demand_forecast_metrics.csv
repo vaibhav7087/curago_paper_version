@@ -1,0 +1,9 @@
+Drug (ATC),MAE Seasonal Naive,MAE Holt-Winters,MAE LightGBM,Data Source
+M01AB,24.09,30.51,25.72,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+M01AE,27.01,29.11,30.12,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+N02BA,15.35,19.62,13.5,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+N02BE,216.56,227.6,241.64,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+N05B,50.78,62.16,50.54,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+N05C,9.42,4.79,9.26,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+R03,91.75,77.18,80.63,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
+R06,30.91,25.08,30.22,Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)
