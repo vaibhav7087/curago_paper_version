@@ -23,9 +23,9 @@
 3. **COVID-19 India district timeseries** (F3 outbreak detection)
    - covid19india.com volunteer project, `https://data.incovid19.org/`
    - License: data freely usable (project licence on covid19india.com);
-     project operations ended 31 Oct 2021 — series **frozen Jan 2020 – Oct 2021**.
-   - Must be cited with the frozen window; results are retrospective detection
-     on a frozen archive, not live surveillance.
+     static archive, observed series **2020-04-26 to 2023-08-22** (retrieved 2026-10-07).
+   - Must cite window + retrieval date; results are retrospective detection
+     on a static archive, not live surveillance.
 
 ## Rejected sources (with rationale)
 

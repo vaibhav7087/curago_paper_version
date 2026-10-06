@@ -29,7 +29,7 @@ missing. Raw files are gitignored; derived artifacts in `ds/models/` are committ
 |---|---|
 | Preferred URL | `https://data.incovid19.org/csv/latest/districts.csv` (open, no auth) |
 | Alternative | any CSV → resample to `district,week,case_count,disease` → `ds/data/raw/district_weekly_cases.csv` |
-| Window | **Frozen Jan 2020 – Oct 2021** (covid19india volunteer ops ended 31 Oct 2021) — cite this window; it is not live surveillance |
+| Window | Observed in file: **2020-04-26 to 2023-08-22** (retrieved 2026-10-07). Static archive, not live surveillance - cite window + retrieval date |
 | Rejected | ProMED-mail / WHO outbreak PDFs — no tabular machine-readable download; transcription risk (see `docs/citations.md`) |
 
 ## Provenance

@@ -16,7 +16,7 @@ notebooks, committed artifacts, and citations.
 |---|---|---|---|
 | F1 triage severity | Can a model trained on real ED visits reduce under-triage? | CDC NHAMCS 2019 ED (public domain) | `ds/train_triage.py` → `triage.pkl`, `triage_features.json`, `metric_table.csv`, `shap_summary.png` |
 | F2 demand forecast | Which forecaster wins on a 6-year pharmacy series? | Kaggle pharma-sales (CC BY-NC 4.0) | `ds/train_forecast.py` → `demand_forecast_comparison.png`, `demand_forecast_metrics.csv` |
-| F3 outbreak detection | Can anomaly detection flag district-level case spikes? | incovid19.org district timeseries (frozen 2020–2021) | `ds/train_outbreak.py` → `outbreak_iso.pkl`, `outbreak_features.json` |
+| F3 outbreak detection | Can anomaly detection flag district-level case spikes? | incovid19.org district timeseries (2020-04-26..2023-08-22) | `ds/train_outbreak.py` → `outbreak_iso.pkl`, `outbreak_features.json` |
 
 ## Reproduce everything
 

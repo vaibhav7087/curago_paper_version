@@ -5,7 +5,7 @@ FAIL-CLOSED: no synthetic fallback. Missing raw data = hard error.
 
 Raw data (choose one, machine-readable CSV only — no ProMED/WHO PDFs):
   Preferred: https://data.incovid19.org/csv/latest/districts.csv
-    (volunteer project, FROZEN Jan 2020 - Oct 2021 window — cite this window in the paper;
+    (static archive, observed window 2020-04-26 to 2023-08-22 - cite window + retrieval date;
      schema has district + Confirmed/Recovered/Deceased timeseries; resample to weekly)
   Or place ds/data/raw/district_weekly_cases.csv with schema:
     district,week,case_count,disease
@@ -21,7 +21,7 @@ MODEL_DIR = HERE / "models"
 RAW = HERE / "data" / "raw" / "district_weekly_cases.csv"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-DATA_SOURCE_LABEL = "data.incovid19.org district timeseries (frozen 2020-2021)"
+DATA_SOURCE_LABEL = "data.incovid19.org district timeseries (2020-04-26..2023-08-22, retrieved 2026-10-07)"
 
 
 def load_real():
@@ -31,7 +31,7 @@ def load_real():
             "Preferred source (open, no auth):\n"
             "  https://data.incovid19.org/csv/latest/districts.csv\n"
             "Resample to district,week,case_count,disease weekly schema and save.\n"
-            "NOTE: dataset is frozen (Jan 2020 - Oct 2021) — cite that window.\n"
+            "NOTE: static archive (observed window 2020-04-26..2023-08-22) - cite window + retrieval date.\n"
             "No synthetic outbreak data is used in this repo."
         )
     df = pd.read_csv(RAW)
