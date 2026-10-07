@@ -426,7 +426,7 @@ def main():
         "supplement_forecast": {
             "months_analyzed": 69,
             "hw_wins": int(tally.get("Holt-Winters", 0)),
-            "naive_wins": int(tally.get("Seasonal naive", 0)),
+            "naive_wins": int(tally.get("Seasonal Naive", 0)),
             "lgbm_wins": int(tally.get("LightGBM", 0)),
         },
     }
