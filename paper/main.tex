@@ -213,6 +213,8 @@ XGBoost. A physician-abstention band routes any case with maximum class
 probability below 0.60 to human review regardless of threshold. Threshold
 tuning moves the model along its ROC curve; it does not change AUC.
 
+\input{../ds/models/paper/paper_T1_triage_models}
+
 \subsection{Split-conformal recall control}
 \label{sec:conformal-method}
 
@@ -220,7 +222,7 @@ To target a sensitivity level with a finite-sample statement, we wrap the
 trained classifier in split-conformal calibration~\cite{vovk2005algorithmic,
 angelopoulos2021gentle}: each replicate draws stratified 60/20/20
 train/calibration/test splits; on the calibration set the decision threshold
-is set to the $\lfloor\alpha(n+1)\rfloor$-th smallest nonconformity quantile
+is set to the $\lfloor\alpha(n+1)\rfloor$-th smallest predicted probability
 among positives at error level $\alpha=\AlphaC$, i.e. a nominal recall of
 $1-\alpha=0.85$. We repeat over \CNseeds{} random seeds (0--199) and report
 the distribution of test recall, the implied thresholds, and abstention
@@ -271,13 +273,11 @@ chest pain and shortness of breath.
 \centering
 \includegraphics[width=3.15in]{paper_fig1_roc}
 \caption{Triage ROC under 5-fold cross-validation (\Nanalysis{} analysis
-encounters): logistic regression AUC \AUClogreg, XGBoost AUC \AUCxgb.
-Marked operating points: default $t=0.50$, tuned $t=\TunedT$, and the
-seed-42 conformal split. Data: CDC NHAMCS 2019 ED.}
+encounters): curves for both learners, chance diagonal, and marked
+default, tuned, and seed-42 conformal operating points. The legend
+reports each curve's AUC. Data: CDC NHAMCS 2019 ED.}
 \label{fig:roc}
 \end{figure}
-
-\input{../ds/models/paper/paper_T1_triage_models}
 
 \subsection{Operating-point selection}
 
@@ -314,10 +314,10 @@ it that way. Mean implied thresholds (\CMeanT{}) and abstention
 \begin{figure}[!t]
 \centering
 \includegraphics[width=3.15in]{paper_fig4_conformal_hist}
-\caption{Split-conformal test recall over \CNseeds{} seeds at
-$\alpha=\AlphaC$: mean \CMeanR{} vs the 0.85 target; \CBelowPct\% of
-individual splits fall below target. The guarantee is marginal, not
-per-split. Data: CDC NHAMCS 2019 ED.}
+\caption{Split-conformal test recall per split over \CNseeds{} random
+splits; the dashed line marks the nominal sensitivity target and the
+solid line the split mean. The guarantee is marginal, not per-split.
+Data: CDC NHAMCS 2019 ED.}
 \label{fig:conformal}
 \end{figure}
 
