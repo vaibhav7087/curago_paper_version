@@ -16,5 +16,5 @@ venv/
 Thumbs.db
 .DS_Store
 
-# NOTE: ds/models/* IS committed (public-domain CDC artifacts + CC-BY-NC
-# forecast figures with attribution). Only .gitkeep-less binaries above are ignored.
+# Archive bundles
+*.zip
