@@ -18,3 +18,13 @@ Thumbs.db
 
 # Archive bundles
 *.zip
+
+# LaTeX build artifacts (paper/main.pdf is committed as the deliverable)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk

@@ -1,0 +1,430 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{url}
+\urlstyle{same}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{../ds/models/paper/}}
+\input{numbers}
+
+\begin{document}
+
+\title{Real-Data Machine Learning for Rural Telemedicine Triage and Outbreak Surveillance}
+
+\author{
+\IEEEauthorblockN{Author One, Author Two}
+\IEEEauthorblockA{
+Placeholder Department, Placeholder Institute\\
+City, India\\
+\{author.one, author.two\}@example.com
+}
+}
+
+\maketitle
+
+\begin{abstract}
+Rural telemedicine platforms face two simultaneous decisions: which individual
+patients can be managed remotely and which require urgent escalation, and
+whether population-level signals indicate a developing outbreak. We evaluate a
+data-science layer built exclusively on public, real-world data: the CDC NHAMCS
+2019 emergency department survey (\Nanalysis{} analysis encounters), the
+covid19india district-level archive (\DWeeks{} district-weeks across
+\NDistricts{} districts), and a Kaggle pharmaceutical sales series
+(\Months{} months). For triage, a class-weighted XGBoost model reaches
+cross-validated AUC \AUCxgb{} versus \AUClogreg{} for a logistic baseline.
+Operating-point selection reduces under-triage from \UnderTPct\% at the default
+threshold to \TunedUnderPct\% at $t=\TunedT$ (recall \TunedRecall), and a
+split-conformal calibration attains mean recall \CMeanR{} over \CNseeds{}
+randomized splits, with \CBelowPct\% of individual splits under the 0.85
+target -- a marginal rather than per-split guarantee. For surveillance, an
+IsolationForest operating at a fixed 5\% alert budget enriches the Delta wave
+\DeltaEnr$\times${} over its background flag rate with a median lead of
+\LeadWk{} weeks; this is reported descriptively because no labeled outbreak
+ground truth exists. No synthetic data is used, and all code and seeds are
+released for exact reproduction.
+\end{abstract}
+
+\begin{IEEEkeywords}
+machine learning, telemedicine, clinical triage, conformal prediction,
+outbreak surveillance, interpretable machine learning.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:intro}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.92\textwidth]{paper_fig0_pipeline}
+\caption{The Curago data-science layer: voice intake and vitals with
+reason-for-visit features feed Module 1 (patient-level triage, XGBoost with
+an abstain band), while district counts feed Module 2 (population-level
+outbreak surveillance, IsolationForest); low-confidence cases route to a
+doctor, and forecasts support medicine delivery. Data: CDC NHAMCS 2019
+(public domain); covid19india static archive; Kaggle pharma sales (CC BY-NC
+4.0, supplementary).}
+\label{fig:pipeline}
+\end{figure*}
+
+Telemedicine services in resource-limited settings routinely carry two
+statistical workloads at once. At the patient level, an intake stream of voice
+transcripts and spot vital signs must be sorted into cases that a remote
+clinician can safely manage and cases that demand in-person escalation; missing
+an urgent case (under-triage) is a safety event, while over-triage consumes
+scarce clinician time. At the population level, the same platform sits on a
+growing archive of aggregated case counts, which can in principle provide
+early warning of local outbreaks before clinicians notice a pattern in
+individual visits. Both workloads are prediction problems, but they are
+severely differently supervised: individual dispositions are recorded, whereas
+district-level outbreak ``truth'' is not.
+
+This paper evaluates the data-science layer of a rural telemedicine platform
+against that asymmetry, using only public real-world datasets. Our first
+module, patient-level triage, is built and benchmarked on the CDC NHAMCS 2019
+emergency department (ED) survey~\cite{nhamcs2019}, which carries vitals,
+reason-for-visit codes, and recorded triage acuity for \Nraw{} raw visits. Our
+second module, population-level surveillance, is built on the open
+covid19india district time-series archive~\cite{covid19india2023} covering
+\NDistricts{} Indian districts. A supplementary module forecasts monthly
+pharmaceutical demand from a public Kaggle point-of-sale series
+(Zdravkovi\'c~\cite{zdravkovic2019pharma}). Together they mirror the
+architecture of the deployed platform (Fig.~\ref{fig:pipeline}) while keeping
+every evaluation number traceable to a committed artifact.
+
+The paper makes four contributions:
+\begin{enumerate}
+\item A safety-first operating-point analysis for triage in which threshold
+selection (rather than model surgery) cuts the under-triage rate from
+\UnderTPct\% to \TunedUnderPct\% at recall \TunedRecall, with an abstention
+band that routes low-confidence predictions to a physician.
+\item An honest calibration study of split-conformal recall control: across
+\CNseeds{} randomized splits the method attains mean recall \CMeanR{}
+(SD \CSdR), yet \CBelowPct\% of individual splits miss the 0.85 target, and we
+quantify exactly which guarantee holds.
+\item A label-free outbreak evaluation design that scores detectors by
+empirical wave enrichment under a fixed alert budget rather than by invented
+precision/recall labels, showing \DeltaEnr$\times${} Delta-wave
+concentration for single-week isolation flags.
+\item A fully deterministic, fail-closed reproducibility pipeline: no
+synthetic data, no silently skipped steps, seed-42 reruns byte-identical, and
+every figure, table, and number regenerated from raw files by script.
+\end{enumerate}
+
+Section~\ref{sec:related} positions this against clinical scoring rules and
+conformal inference. Section~\ref{sec:methods} describes the data and
+protocols, Section~\ref{sec:results} reports results, and
+Section~\ref{sec:discussion} states limitations plainly, including the
+US-to-India transfer gap.
+
+\section{Related Work}
+\label{sec:related}
+
+\emph{Clinical early-warning scores.} The National Early Warning Score
+NEWS2~\cite{rcp2017news2,smith2019news2} is the standard vitals-only
+acuity rule and the natural baseline for any triage model; we implement it
+directly as a comparator rather than assuming superiority over it.
+
+\emph{Gradient boosting for clinical prediction.} XGBoost~\cite{chen2016xgboost}
+and LightGBM~\cite{ke2017lightgbm} are the de facto tabular learners, and
+scikit-learn~\cite{pedregosa2011scikit} provides the linear baselines and
+splitting utilities used here. Our contribution is not a new learner but an
+operating-point and calibration treatment of an ordinary boosted model under
+an explicit asymmetric cost.
+
+\emph{Distribution-free uncertainty.} Conformal
+prediction~\cite{vovk2005algorithmic} and its modern
+tutorials~\cite{angelopoulos2021gentle} give finite-sample coverage
+statements under exchangeability. We use the split-conformal construction to
+control sensitivity rather than set size, and we report the finite-sample
+behavior across random splits because the textbook guarantee is marginal.
+
+\emph{Interpretability.} SHAP~\cite{lundberg2017shap} attributions are used
+to audit what the triage model relies on, specifically whether it attends to
+clinically plausible vitals and reason-for-visit patterns.
+
+\emph{Outbreak detection without labels.} Frequency-threshold and
+scan-statistic detectors predate machine learning, and open dashboards such as
+OpenDengue~\cite{clarke2024opendengue} illustrate that curated public
+outbreak labels are rare. We therefore evaluate detectors descriptively
+against wave windows rather than against fabricated ground truth.
+
+\emph{Demand forecasting.} Seasonal-naive and
+Holt-Winters~\cite{seabold2010statsmodels} baselines are reported alongside
+LightGBM precisely because complex models do not automatically win on short
+monthly series.
+
+\section{Data and Methods}
+\label{sec:methods}
+
+\subsection{Datasets}
+\label{sec:datasets}
+
+\emph{Triage (NHAMCS 2019 ED).} The National Hospital Ambulatory Medical Care
+Survey 2019 emergency department file~\cite{nhamcs2019} is a US
+public-domain, de-identified survey. Restricting to records with a valid
+recorded triage level yields \Nanalysis{} analysis encounters from \Nraw{}
+raw records, with high-acuity prevalence \Prev. The target label marks
+encounters recorded as emergent or urgent (the escalation-worthy class under
+the platform's routing policy). Features are age, sex, six vital signs
+(temperature, pulse, respiratory rate, systolic and diastolic pressure, oxygen
+saturation), pain scale, and dummy indicators for the 20 most frequent
+reason-for-visit codes decoded with official NCHS labels; missing vitals are
+median-imputed inside each training fold. Cohort medians and dataset extents
+are summarized in the supplementary cohort table (repository artifact
+\texttt{paper\_T7\_cohort}).
+
+\emph{Outbreak (covid19india archive).} The static district-level
+archive~\cite{covid19india2023} spans 2020-04-26 to 2023-08-22 and is
+resampled to \DWeeks{} district-weeks over \NDistricts{} state-qualified
+districts. It contains reported case counts only: no outbreak labels exist at
+district-week resolution.
+
+\emph{Supplementary demand (Kaggle pharma sales).} A monthly point-of-sale
+series of eight ATC drug groups~\cite{zdravkovic2019pharma} (CC BY-NC 4.0)
+contributes \Months{} complete months; a partial collection month is excluded
+by rule, and the final 12 months form the holdout.
+
+\subsection{Triage model and operating rule}
+\label{sec:triage-method}
+
+Two models are trained under a shared 5-fold stratified protocol
+(seed 42): a class-weighted logistic regression with standardization (the
+baseline) and a class-weighted XGBoost~\cite{chen2016xgboost}
+(\texttt{n\_estimators}=200, depth 6, learning rate 0.1,
+\texttt{scale\_pos\_weight} computed from training folds), both behind a
+median imputer using scikit-learn~\cite{pedregosa2011scikit}. Under-triage is
+defined as $1-\text{recall}$ on the high-acuity class.
+
+Rather than accept the default 0.5 threshold, we select the operating point
+from the out-of-fold probability sweep as the lowest threshold whose recall
+reaches at least 0.80, tie-broken by precision; this yields $t=\TunedT$ for
+XGBoost. A physician-abstention band routes any case with maximum class
+probability below 0.60 to human review regardless of threshold. Threshold
+tuning moves the model along its ROC curve; it does not change AUC.
+
+\subsection{Split-conformal recall control}
+\label{sec:conformal-method}
+
+To target a sensitivity level with a finite-sample statement, we wrap the
+trained classifier in split-conformal calibration~\cite{vovk2005algorithmic,
+angelopoulos2021gentle}: each replicate draws stratified 60/20/20
+train/calibration/test splits; on the calibration set the decision threshold
+is set to the $\lfloor\alpha(n+1)\rfloor$-th smallest nonconformity quantile
+among positives at error level $\alpha=\AlphaC$, i.e. a nominal recall of
+$1-\alpha=0.85$. We repeat over \CNseeds{} random seeds (0--199) and report
+the distribution of test recall, the implied thresholds, and abstention
+rates. The protocol uses train-fold statistics only. As a clinical reference
+we also evaluate NEWS2~\cite{rcp2017news2,smith2019news2} computed from the
+vitals columns alone.
+
+\subsection{Outbreak surveillance under an alert budget}
+\label{sec:outbreak-method}
+
+District-week counts are converted to weekly features and fed to an
+IsolationForest with contamination 0.05, which fixes the alert budget at 5\%
+of district-weeks by construction; we never present that fraction as a
+detected-outbreak rate. Two variants (single-week flags and
+confirmation-filtered flags) are compared against a rolling 4-week z-score
+baseline~\cite{pedregosa2011scikit}. Because no gold labels exist, evaluation
+is \emph{descriptive enrichment}: for the Delta (2021-04-01--2021-06-30) and
+Omicron wave windows we report the flag rate inside the window versus the
+background flag rate outside it, district coverage, and median lead relative
+to window start, mirroring the alert-budget evaluation style of public
+health surveillance practice.
+
+\subsection{Reproducibility discipline}
+\label{sec:repro}
+
+All pipelines fail closed: if a raw file is absent the script exits with the
+download URL instead of substituting synthetic data. Outputs are written as
+committed artifacts; seed-42 reruns reproduce every CSV and JSON
+byte-identically, and the paper's numeric macros are generated from the
+committed \texttt{paper\_numbers.json} rather than typed by hand.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Triage discrimination and interpretability}
+
+Table~\ref{tab:triage_models} compares the two learners at the default
+threshold. XGBoost leads on AUC (\AUCxgb{} vs \AUClogreg{}) and precision,
+but at $t=0.5$ it misses \UnderT{} of high-acuity patients, an unacceptable
+operating point for triage. Fig.~\ref{fig:roc} shows the ROC curves with the
+default, tuned, and conformal operating points marked: the entire useful
+operating region lies well below $t=0.5$. SHAP attributions
+(supplementary figure, repository artifact \texttt{paper\_fig2\_shap})
+confirm the model leans on age, pulse, respiratory rate, and pain score, with
+reason-for-visit codes contributing clinically recognizable splits such as
+chest pain and shortness of breath.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.4in]{paper_fig1_roc}
+\caption{Triage ROC under 5-fold cross-validation (\Nanalysis{} analysis
+encounters): logistic regression AUC \AUClogreg, XGBoost AUC \AUCxgb.
+Marked operating points: default $t=0.50$, tuned $t=\TunedT$, and the
+seed-42 conformal split. Data: CDC NHAMCS 2019 ED.}
+\label{fig:roc}
+\end{figure}
+
+\input{../ds/models/paper/paper_T1_triage_models}
+
+\subsection{Operating-point selection}
+
+Table~\ref{tab:operating_points} and Fig.~\ref{fig:tradeoff} show the central
+triage result: lowering the threshold from 0.50 to $\TunedT$ cuts
+under-triage from \UnderTPct\% to \TunedUnderPct\% (recall \TunedRecall) at
+the cost of precision (\TunedPrec{}) and abstention \TunedAbst; over-triage
+rises correspondingly. This is the standard sensitivity-first trade of
+emergency triage, reported on both axes so the exchange is visible. The
+abstention band keeps \TunedAbst{} of cases with the model deferring to a
+physician, which bounds the blast radius of the precision drop.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.4in]{paper_fig3_tradeoff}
+\caption{Out-of-fold threshold trade-offs (recall, precision, under- and
+over-triage, abstention) with the pre-declared selections
+$t=\TunedT$ (XGBoost). Data: CDC NHAMCS 2019 ED.}
+\label{fig:tradeoff}
+\end{figure}
+
+\input{../ds/models/paper/paper_T2_operating_points}
+
+\subsection{Conformal recall control}
+
+Table~\ref{tab:conformal} sweeps the conformal error level over
+\CNseeds{} splits per setting. At $\alpha=\AlphaC$ the mean test recall is
+\CMeanR{} (SD \CSdR), yet \CBelowPct\% of the splits miss the 0.85 mark
+(Fig.~\ref{fig:conformal}); the finite-sample statement is
+marginal over calibration draws, not a per-deployment promise, and we state
+it that way. Mean implied thresholds (\CMeanT{}) and abstention
+(\CMeanA{}) are stable across seeds.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.4in]{paper_fig4_conformal_hist}
+\caption{Split-conformal test recall over \CNseeds{} seeds at
+$\alpha=\AlphaC$: mean \CMeanR{} vs the 0.85 target; \CBelowPct\% of
+individual splits fall below target. The guarantee is marginal, not
+per-split. Data: CDC NHAMCS 2019 ED.}
+\label{fig:conformal}
+\end{figure}
+
+\input{../ds/models/paper/paper_T4_conformal}
+
+On the seed-42 reference split the conformal selector reaches recall \SdR{}
+(95\% bootstrap CI \SdCIlo--\SdCIhi), precision \SdP, AUC \SdAUC, Brier
+\SdBrier, abstention \SdAbst, at threshold \SdT. The vitals-only NEWS2
+baseline cannot match the target on this cohort: no cutoff reaches the 0.85
+recall level (cutoff $\geq 1$ attains recall \NewsAtOneR{} at precision
+\NewsAtOneP; the clinical cutoff $\geq 5$ attains \NewsAtFiveR{} at \NewsAtFiveP).
+The learned model therefore buys recall at comparable precision, but its
+reliability diagram (supplementary artifact
+\texttt{paper\_figS1b\_calibration}, Brier \SdBrier) shows overconfident
+probabilities: scores are rank-useful for the threshold rule and are not
+quoted as absolute risks.
+
+\subsection{Outbreak surveillance}
+
+Table~\ref{tab:outbreak} and Fig.~\ref{fig:outbreak} compare detectors
+descriptively. Single-week IsolationForest flags concentrate in the Delta
+window at rate \DeltaFlag{} versus \DeltaOut{} outside, an enrichment of
+\DeltaEnr$\times${}, with district coverage \DeltaCov{} and median lead
+\LeadWk{} weeks over a background flag rate of \BgIso. Requiring a
+confirmation week halves the background to \BgIsoC{} but costs a week of
+lead; the z-score baseline leads earliest and covers the widest share of
+districts, at roughly four times the background flag rate of single-week
+isolation flags (\BgZ). None of these numbers is a precision or recall:
+without district-level outbreak labels, honest claims stop at enrichment.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=3.4in]{paper_fig5_outbreak}
+\caption{Outbreak methods versus the Delta and Omicron windows (in-window
+flag rate and district coverage): descriptive enrichment only; single-week
+isolation flags enrich Delta \DeltaEnr$\times${}. Data: covid19india
+static archive, \NDistricts{} districts.}
+\label{fig:outbreak}
+\end{figure}
+
+\input{../ds/models/paper/paper_T6_outbreak}
+
+\subsection{Supplementary demand forecast}
+
+On the 12-month holdout over \Months{} months, per-group MAE winners are
+Holt-Winters on \HWWins{} of 8 drug groups, seasonal naive on \NaiveWins{},
+and LightGBM on \LGBMWins{} (supplementary forecast table, repository
+artifact \texttt{paper\_TS1\_forecast}). The honest reading is
+that classical baselines remain competitive on short monthly series; this
+module supports logistics, not clinical claims, and is excluded from the main
+findings (supplementary figures in the repository).
+
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{What holds.}
+On this cohort, a standard boosted model with a deliberately chosen threshold
+and a physician-abstention band delivers a large, auditable reduction in
+under-triage, and split-conformal calibration provides a workable mechanism
+for targeting sensitivity with a stated error level. The surveillance module
+shows that even a label-free detector concentrates alerts in known wave
+windows far above its background rate, which is the strongest claim the data
+support.
+
+\paragraph{Limitations.}
+\emph{Transfer.} NHAMCS is US ED data; rural-Indian intake populations,
+disease mix, and vital-sign distributions differ. Conformal coverage holds
+under exchangeability within this sample and does not automatically transfer
+under geographic covariate shift; in deployment the model is a
+decision-support prior behind abstention and physician verification.
+\emph{Guarantee strength.} The conformal guarantee is marginal: \CBelowPct\%
+of individual splits miss the target, so a single unlucky calibration split
+can under-deliver.
+\emph{Calibration.} Tree probabilities are overconfident (Brier \SdBrier);
+they are used for ranking and thresholds, not as quoted risks.
+\emph{Labels.} Outbreak evaluation is descriptive enrichment against wave
+windows, not precision/recall; the archive is retrospective, not a live
+surveillance feed.
+\emph{Protocol.} Triage numbers combine 5-fold cross-validation with a
+single-protocol split study; there is no second external test set, and the
+demand forecast uses a single holdout without rolling origin evaluation.
+
+\section{Data Availability, Licensing, and Ethics}
+\label{sec:availability}
+
+All three datasets are public: NHAMCS 2019 ED is US public domain from the
+CDC/NCHS~\cite{nhamcs2019}; the covid19india district archive is an open
+static release~\cite{covid19india2023}; the Kaggle pharma-sales series is CC
+BY-NC 4.0~\cite{zdravkovic2019pharma}. No private, proprietary, or synthetic
+patient data was used. The analysis uses de-identified, aggregated, or
+public survey records, so no institutional approval or individual consent
+applies; license terms are restated in the repository's data manifest. Code,
+ingestion, training, and figure/table generation scripts are released under
+the MIT License at \url{https://github.com/vaibhav7087/curago_paper_version},
+and every reported number is regenerated from raw files by a deterministic,
+fail-closed pipeline.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Pairing a threshold-tuned, abstention-guarded triage model with a
+label-free outbreak detector turns a telemedicine platform's raw streams into
+two quantified decisions: which patients escalate, and where to look next.
+The results are deliberately bounded---\UnderTPct\% under-triage reduced to
+\TunedUnderPct\% at recall \TunedRecall, a marginal conformal guarantee of
+\CMeanR{} mean recall, and \DeltaEnr$\times${} descriptive wave
+enrichment---and every number is reproducible from public data with released
+code. Future work is prospective validation on rural-Indian intake data and
+calibration monitoring under drift.
+
+\IEEEtriggeratref{8}
+\bibliographystyle{IEEEtran}
+\bibliography{../docs/references}
+
+\end{document}
