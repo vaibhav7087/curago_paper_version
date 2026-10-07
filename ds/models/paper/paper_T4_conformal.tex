@@ -1,7 +1,8 @@
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Split-conformal recall control over 200 random 60$/$20$/$20 splits (XGBoost, calibration quantile on positives). The guarantee is marginal: individual splits vary.}
 \label{tab:conformal}
+\begin{adjustbox}{max width=0.98\textwidth}
 \begin{tabular}{lrrrrrrr}
 \toprule
 alpha (miss target) & Mean recall & SD & Min & Max & Frac. splits <0.85 & Mean precision & Data Source \\
@@ -13,5 +14,6 @@ alpha (miss target) & Mean recall & SD & Min & Max & Frac. splits <0.85 & Mean p
 0.3 & 0.7 & 0.032 & 0.604 & 0.795 & 1.0 & 0.241 & CDC NHAMCS 2019 ED (n=13,595) \\
 \bottomrule
 \end{tabular}
-\par\vspace{2pt}\raggedright\footnotesize \textbf{Data source:} CDC NHAMCS 2019 ED (n=13,595). Alpha 0.15 is the pre-declared main setting (also conformal_repeats.csv, 200 seeds).
-\end{table}
+\end{adjustbox}
+\par\vspace{2pt}\raggedright\footnotesize \textbf{Data source:} CDC NHAMCS 2019 ED (n=13,595). Alpha 0.15 is the pre-declared main setting (also conformal\_repeats.csv, 200 seeds).
+\end{table*}

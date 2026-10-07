@@ -27,8 +27,10 @@ RAW_DIR = HERE / "data" / "raw"
 PROCESSED_DIR = HERE / "data" / "processed"
 
 SRC_NHAMCS = "CDC NHAMCS 2019 ED (n=13,595)"
+SRC_NHAMCS_SHORT = "CDC NHAMCS 2019 ED"
 SRC_KAGGLE = "Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0)"
 SRC_COVID = "covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+SRC_COVID_SHORT = "covid19india static archive"
 RAW_NHAMCS_N = 19481  # ed2019_sas.sas7bdat shape=(19481, 911); see ds/data/README.md
 
 
@@ -54,27 +56,33 @@ def esc(s: str) -> str:
 
 
 def booktabs(df: pd.DataFrame, caption: str, label: str, colspec: str,
-             note: str = "") -> str:
+             note: str = "", span: bool = False) -> str:
     head = " & ".join(esc(str(c)) for c in df.columns) + r" \\"
     rows = []
     for _, row in df.iterrows():
         rows.append(" & ".join(esc(str(v)) for v in row.values) + r" \\")
     note_tex = f"\n\\par\\vspace{{2pt}}\\raggedright\\footnotesize {note}" if note else ""
+    env, close = ("table*", "table*") if span else ("table", "table")
+    body = f"\\begin{{tabular}}{{{colspec}}}\n\\toprule\n{head}\n\\midrule\n"
+    body += "\n".join(rows)
+    body += "\n\\bottomrule\n\\end{tabular}"
+    if span:
+        # two-column span; shrink only if wider than \textwidth (never stretch)
+        body = ("\\begin{adjustbox}{max width=0.98\\textwidth}\n"
+                + body + "\n\\end{adjustbox}")
     return (
-        "\\begin{table}[t]\n\\centering\n"
+        f"\\begin{{{env}}}[t]\n\\centering\n"
         f"\\caption{{{caption}}}\n\\label{{{label}}}\n"
-        f"\\begin{{tabular}}{{{colspec}}}\n\\toprule\n{head}\n\\midrule\n"
-        + "\n".join(rows)
-        + "\n\\bottomrule\n\\end{tabular}" + note_tex + "\n\\end{table}\n"
+        + body + note_tex + f"\n\\end{{{env}}}\n"
     )
 
 
 def emit(name: str, df: pd.DataFrame, caption: str, label: str, colspec: str,
-         note: str = "") -> None:
+         note: str = "", span: bool = False) -> None:
     csv_path = PAPER_DIR / f"{name}.csv"
     tex_path = PAPER_DIR / f"{name}.tex"
     df.to_csv(csv_path, index=False, encoding="utf-8", lineterminator="\n")
-    tex_path.write_text(booktabs(df, caption, label, colspec, note),
+    tex_path.write_text(booktabs(df, caption, label, colspec, note, span),
                         encoding="utf-8", newline="\n")
     back = pd.read_csv(csv_path)
     assert list(back.columns) == list(df.columns), f"{name}: column drift"
@@ -119,6 +127,7 @@ def main():
         ["Model", "AUC", "Recall", "Precision", "F1", "Under-triage", "Data Source"]]
     for c in ["AUC", "Recall", "Precision", "F1", "Under-triage"]:
         t1[c] = t1[c].map(r3)
+    t1["Data Source"] = SRC_NHAMCS_SHORT
     assert r3(float(metric.loc[metric.Model.str.startswith("XGBoost"),
                                "AUC-ROC"].iloc[0])) == 0.732, "XGB AUC claim drift"
     assert r3(float(metric.loc[metric.Model.str.startswith("Logistic"),
@@ -126,7 +135,7 @@ def main():
     emit("paper_T1_triage_models", t1,
          "Triage model comparison, 5-fold cross-validation (t=0.5, seed 42).",
          "tab:triage_models", "lrrrrrr",
-         f"\\textbf{{Data source:}} {SRC_NHAMCS}.")
+         f"\\textbf{{Data source:}} {SRC_NHAMCS}.", span=True)
 
     # ----------------------------------------------- T2: operating points (abstain)
     x50 = trade[(trade.model == "xgboost") & (trade.threshold == 0.50)].iloc[0]
@@ -160,13 +169,13 @@ def main():
          "Abstention": r3(se["abstention_rate"]), "AUC": r3(se["auc"])},
     ]
     t2 = pd.DataFrame(rows)
-    t2["Data Source"] = SRC_NHAMCS
+    t2["Data Source"] = SRC_NHAMCS_SHORT
     emit("paper_T2_operating_points", t2,
          "Operating points for the triage module: default, tuned (pre-declared "
          "recall $\\geq 0.80$ rule) and split-conformal (seed 42).",
          "tab:operating_points", "lrrrrrrr",
          f"\\textbf{{Data source:}} {SRC_NHAMCS}. AUC is threshold-independent "
-         "(5-fold CV); OOF = out-of-fold.")
+         "(5-fold CV); OOF = out-of-fold.", span=True)
 
     # --------------------------------------------------- T3: threshold sweep (suppl)
     keep = {0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.70, 0.90}
@@ -225,7 +234,7 @@ def main():
          "individual splits vary.",
          "tab:conformal", "lrrrrrrr",
          f"\\textbf{{Data source:}} {SRC_NHAMCS}. Alpha 0.15 is the pre-declared "
-         "main setting (also conformal_repeats.csv, 200 seeds).")
+         "main setting (also conformal\\_repeats.csv, 200 seeds).", span=True)
 
     # ------------------------------------- T5: seed-42 test + NEWS2 baseline (suppl)
     def ci_str(key):
@@ -277,7 +286,7 @@ def main():
                          "Median lead (weeks)": r3(e["median_lead_weeks"]),
                          "Background rate": r3(bg)})
     t6 = pd.DataFrame(rows)
-    t6["Data Source"] = SRC_COVID
+    t6["Data Source"] = SRC_COVID_SHORT
     iso_d = outbreak["methods"]["iso_single"]["delta"]
     assert (r3(iso_d["flag_rate_in_window"]), r3(iso_d["district_coverage"])) == \
         (0.250, 0.398), "iso_single delta claim drift"
@@ -296,7 +305,7 @@ def main():
          "(0.250 inside vs 0.036 outside).",
          "tab:outbreak", "llrrrrr",
          f"\\textbf{{Data source:}} {SRC_COVID}; {outbreak['n_districts']} "
-         "state-qualified districts, 126,712 district-weeks.")
+         "state-qualified districts, 126,712 district-weeks.", span=True)
 
     # ---------------------------------------------------- T7: cohort + datasets
     def med_iqr(s: pd.Series) -> str:

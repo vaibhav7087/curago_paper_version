@@ -1,14 +1,16 @@
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Triage model comparison, 5-fold cross-validation (t=0.5, seed 42).}
 \label{tab:triage_models}
+\begin{adjustbox}{max width=0.98\textwidth}
 \begin{tabular}{lrrrrrr}
 \toprule
 Model & AUC & Recall & Precision & F1 & Under-triage & Data Source \\
 \midrule
-Logistic Regression (baseline) & 0.719 & 0.609 & 0.269 & 0.373 & 0.391 & CDC NHAMCS 2019 ED (n=13595) \\
-XGBoost (class-weighted) & 0.732 & 0.513 & 0.334 & 0.405 & 0.487 & CDC NHAMCS 2019 ED (n=13595) \\
+Logistic Regression (baseline) & 0.719 & 0.609 & 0.269 & 0.373 & 0.391 & CDC NHAMCS 2019 ED \\
+XGBoost (class-weighted) & 0.732 & 0.513 & 0.334 & 0.405 & 0.487 & CDC NHAMCS 2019 ED \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\vspace{2pt}\raggedright\footnotesize \textbf{Data source:} CDC NHAMCS 2019 ED (n=13,595).
-\end{table}
+\end{table*}
