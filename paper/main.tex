@@ -10,6 +10,11 @@
 \urlstyle{same}
 \usepackage[hidelinks]{hyperref}
 
+% tighten float separation (IEEE defaults leave large gaps; helps pagination)
+\setlength{\textfloatsep}{14pt plus 2pt minus 2pt}
+\setlength{\floatsep}{10pt plus 2pt minus 2pt}
+\setlength{\intextsep}{10pt plus 2pt minus 2pt}
+
 \graphicspath{{../ds/models/paper/}}
 \input{numbers}
 
@@ -27,6 +32,10 @@ City, India\\
 }
 
 \maketitle
+% IEEEtran conference blanks header/footer page numbers; restore centered
+% footer numbers (required for submission/hard-copy pagination)
+\pagestyle{plain}
+\thispagestyle{plain}
 
 \begin{abstract}
 Rural telemedicine platforms face two simultaneous decisions: which individual
@@ -115,26 +124,23 @@ synthetic data, no silently skipped steps, seed-42 reruns byte-identical, and
 every figure, table, and number regenerated from raw files by script.
 \end{enumerate}
 
-Section~\ref{sec:related} positions this against clinical scoring rules and
-conformal inference. Section~\ref{sec:methods} describes the data and
-protocols, Section~\ref{sec:results} reports results, and
-Section~\ref{sec:discussion} states limitations plainly, including the
-US-to-India transfer gap.
+Sections~\ref{sec:related}--\ref{sec:discussion} cover related work, data
+and protocols, results, and limitations, including the US-to-India transfer
+gap.
 
 \section{Related Work}
 \label{sec:related}
 
 \emph{Clinical early-warning scores.} The National Early Warning Score
 NEWS2~\cite{rcp2017news2,smith2019news2} is the standard vitals-only
-acuity rule and the natural baseline for any triage model; we implement it
-directly as a comparator rather than assuming superiority over it.
+acuity rule and the natural baseline for any triage model; we implement it as
+a direct comparator.
 
 \emph{Gradient boosting for clinical prediction.} XGBoost~\cite{chen2016xgboost}
-and LightGBM~\cite{ke2017lightgbm} are the de facto tabular learners, and
-scikit-learn~\cite{pedregosa2011scikit} provides the linear baselines and
-splitting utilities used here. Our contribution is not a new learner but an
-operating-point and calibration treatment of an ordinary boosted model under
-an explicit asymmetric cost.
+and LightGBM~\cite{ke2017lightgbm} are the de facto tabular learners;
+scikit-learn~\cite{pedregosa2011scikit} supplies the linear baseline. Our
+contribution is not a new learner but an operating-point and calibration
+treatment of an ordinary boosted model under explicit asymmetric cost.
 
 \emph{Distribution-free uncertainty.} Conformal
 prediction~\cite{vovk2005algorithmic} and its modern
@@ -143,9 +149,9 @@ statements under exchangeability. We use the split-conformal construction to
 control sensitivity rather than set size, and we report the finite-sample
 behavior across random splits because the textbook guarantee is marginal.
 
-\emph{Interpretability.} SHAP~\cite{lundberg2017shap} attributions are used
-to audit what the triage model relies on, specifically whether it attends to
-clinically plausible vitals and reason-for-visit patterns.
+\emph{Interpretability.} SHAP~\cite{lundberg2017shap} attributions audit
+whether the model attends to clinically plausible vitals and reason-for-visit
+patterns.
 
 \emph{Outbreak detection without labels.} Frequency-threshold and
 scan-statistic detectors predate machine learning, and open dashboards such as
@@ -240,11 +246,10 @@ health surveillance practice.
 \subsection{Reproducibility discipline}
 \label{sec:repro}
 
-All pipelines fail closed: if a raw file is absent the script exits with the
-download URL instead of substituting synthetic data. Outputs are written as
-committed artifacts; seed-42 reruns reproduce every CSV and JSON
-byte-identically, and the paper's numeric macros are generated from the
-committed \texttt{paper\_numbers.json} rather than typed by hand.
+All pipelines fail closed: a missing raw file aborts the script with its
+download URL instead of substituting synthetic data. Seed-42 reruns
+reproduce every committed CSV and JSON byte-identically, and all paper
+numbers are regenerated from \texttt{paper\_numbers.json}.
 
 \section{Results}
 \label{sec:results}
@@ -264,7 +269,7 @@ chest pain and shortness of breath.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=3.4in]{paper_fig1_roc}
+\includegraphics[width=3.15in]{paper_fig1_roc}
 \caption{Triage ROC under 5-fold cross-validation (\Nanalysis{} analysis
 encounters): logistic regression AUC \AUClogreg, XGBoost AUC \AUCxgb.
 Marked operating points: default $t=0.50$, tuned $t=\TunedT$, and the
@@ -287,7 +292,7 @@ physician, which bounds the blast radius of the precision drop.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=3.4in]{paper_fig3_tradeoff}
+\includegraphics[width=3.15in]{paper_fig3_tradeoff}
 \caption{Out-of-fold threshold trade-offs (recall, precision, under- and
 over-triage, abstention) with the pre-declared selections
 $t=\TunedT$ (XGBoost). Data: CDC NHAMCS 2019 ED.}
@@ -308,7 +313,7 @@ it that way. Mean implied thresholds (\CMeanT{}) and abstention
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=3.4in]{paper_fig4_conformal_hist}
+\includegraphics[width=3.15in]{paper_fig4_conformal_hist}
 \caption{Split-conformal test recall over \CNseeds{} seeds at
 $\alpha=\AlphaC$: mean \CMeanR{} vs the 0.85 target; \CBelowPct\% of
 individual splits fall below target. The guarantee is marginal, not
@@ -333,9 +338,9 @@ quoted as absolute risks.
 \subsection{Outbreak surveillance}
 
 Table~\ref{tab:outbreak} and Fig.~\ref{fig:outbreak} compare detectors
-descriptively. Single-week IsolationForest flags concentrate in the Delta
-window at rate \DeltaFlag{} versus \DeltaOut{} outside, an enrichment of
-\DeltaEnr$\times${}, with district coverage \DeltaCov{} and median lead
+descriptively. Single-week IsolationForest flags hit rate \DeltaFlag{} inside
+the Delta window versus \DeltaOut{} outside --- the largest concentration of
+any method --- with district coverage \DeltaCov{} and median lead
 \LeadWk{} weeks over a background flag rate of \BgIso. Requiring a
 confirmation week halves the background to \BgIsoC{} but costs a week of
 lead; the z-score baseline leads earliest and covers the widest share of
@@ -345,7 +350,7 @@ without district-level outbreak labels, honest claims stop at enrichment.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=3.4in]{paper_fig5_outbreak}
+\includegraphics[width=3.15in]{paper_fig5_outbreak}
 \caption{Outbreak methods versus the Delta and Omicron windows (in-window
 flag rate and district coverage): descriptive enrichment only; single-week
 isolation flags enrich Delta \DeltaEnr$\times${}. Data: covid19india
@@ -368,16 +373,15 @@ findings (supplementary figures in the repository).
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{What holds.}
+\paragraph{What holds}
 On this cohort, a standard boosted model with a deliberately chosen threshold
 and a physician-abstention band delivers a large, auditable reduction in
 under-triage, and split-conformal calibration provides a workable mechanism
-for targeting sensitivity with a stated error level. The surveillance module
-shows that even a label-free detector concentrates alerts in known wave
-windows far above its background rate, which is the strongest claim the data
+for targeting sensitivity with a stated error level. The surveillance module shows that a label-free detector concentrates alerts
+in known wave windows far above background, the strongest claim the labels
 support.
 
-\paragraph{Limitations.}
+\paragraph{Limitations}
 \emph{Transfer.} NHAMCS is US ED data; rural-Indian intake populations,
 disease mix, and vital-sign distributions differ. Conformal coverage holds
 under exchangeability within this sample and does not automatically transfer
@@ -423,7 +427,6 @@ enrichment---and every number is reproducible from public data with released
 code. Future work is prospective validation on rural-Indian intake data and
 calibration monitoring under drift.
 
-\IEEEtriggeratref{8}
 \bibliographystyle{IEEEtran}
 \bibliography{../docs/references}
 
