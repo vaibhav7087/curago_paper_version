@@ -70,3 +70,42 @@ Finding stands: naive baselines are competitive on 2/8 drugs — stated, not hid
 - License chain verified: Kaggle page (CC BY-NC 4.0) → mirror README restates it →
   `docs/citations.md` attributes → metric CSVs carry the license tag. Project code
   is MIT (`LICENSE`); data terms are unaffected.
+
+## Conformal triage (added 2026-10-08, `conformal_triage.py`)
+
+Split-conformal recall control, alpha=0.15: 60/20/20 stratified splits, XGB
+(existing config + hist/n_jobs, train-only scale_pos_weight), calibration
+quantile k=floor(0.15·(n+1)) on calibration positives. 200 seeds (0–199):
+
+- Mean test recall **0.8504** vs target 0.85; **46% of individual splits fall
+  below 0.85** — the guarantee is marginal (average over calibration draws),
+  never per-split. Histogram: `conformal_recall_hist.png`.
+- Mean threshold 0.21, mean abstention 0.22. Alpha sweep means (recall/precision):
+  0.05→0.953/0.171, 0.10→0.902/0.185, 0.15→0.850/0.198, 0.20→0.800/0.212,
+  0.30→0.700/0.241 (`conformal_alpha_sweep.csv`).
+- Seed-42 reference split (`severity_extras.json`): t=0.1731, recall 0.913
+  (95% CI 0.886–0.940), precision 0.187 (0.169–0.203), AUC 0.739
+  (0.713–0.766), Brier 0.1575, abstention 0.231.
+- NEWS2 vitals-only baseline: **no cutoff ≥1 reaches 0.85 recall on
+  calibration** (matched comparison infeasible — documented). Clinical cutoff
+  ≥5: recall 0.138/precision 0.207; max-recall cutoff 1: 0.669/0.168.
+  Conformal XGB (0.913/0.187) wins on recall at comparable precision.
+- Reliability diagram (`calibration_curve.png`): model is overconfident —
+  probabilities are rank-useful for the threshold rule, not quoted as risks.
+
+Limitations: the conformal guarantee assumes exchangeability between
+calibration and test (holds within this US ED sample by construction); it does
+NOT transfer automatically to rural-India deployment data. F1 evaluation is
+5-fold CV plus this single-protocol split study — no second held-out set.
+
+## Outbreak methods comparison (added 2026-10-08, `outbreak_eval_v2.py`)
+
+| Method | Delta rate / coverage / lead | Omicron rate / coverage / lead | Background |
+|---|---|---|---|
+| iso_single | 0.250 / 0.398 / 2.0 wk | 0.167 / 0.525 / 2.0 wk | 0.024 |
+| iso_confirmed | 0.199 / 0.324 / 1.0 wk | 0.116 / 0.399 / 1.0 wk | 0.013 |
+| zscore (prior-4wk) | 0.276 / 0.751 / 4.0 wk | 0.135 / 0.583 / 2.0 wk | 0.093 |
+
+Reading: confirmation costs ~1 week of lead for fewer/weaker alerts; the
+z-baseline leads earliest with widest coverage but ~4x the background rate.
+All descriptive (`outbreak_eval_v2.json`, `outbreak_methods_compare.png`).
