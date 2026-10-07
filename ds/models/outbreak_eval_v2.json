@@ -1,0 +1,90 @@
+{
+  "windows": {
+    "delta": [
+      "2021-04-01",
+      "2021-06-30"
+    ],
+    "omicron": [
+      "2022-01-01",
+      "2022-03-31"
+    ]
+  },
+  "n_districts": 840,
+  "methods": {
+    "iso_single": {
+      "delta": {
+        "alert_district_weeks": 2130,
+        "window_district_weeks": 8535,
+        "flag_rate_in_window": 0.2496,
+        "district_coverage": 0.3976,
+        "districts_alerted": 334,
+        "median_lead_weeks": 2.0,
+        "n_lead_districts": 334
+      },
+      "omicron": {
+        "alert_district_weeks": 1666,
+        "window_district_weeks": 9961,
+        "flag_rate_in_window": 0.1673,
+        "district_coverage": 0.525,
+        "districts_alerted": 441,
+        "median_lead_weeks": 2.0,
+        "n_lead_districts": 441
+      },
+      "background": {
+        "alert_district_weeks": 2540,
+        "background_district_weeks": 108216,
+        "background_rate": 0.0235
+      }
+    },
+    "iso_confirmed": {
+      "delta": {
+        "alert_district_weeks": 1695,
+        "window_district_weeks": 8535,
+        "flag_rate_in_window": 0.1986,
+        "district_coverage": 0.3238,
+        "districts_alerted": 272,
+        "median_lead_weeks": 1.0,
+        "n_lead_districts": 272
+      },
+      "omicron": {
+        "alert_district_weeks": 1150,
+        "window_district_weeks": 9961,
+        "flag_rate_in_window": 0.1155,
+        "district_coverage": 0.3988,
+        "districts_alerted": 335,
+        "median_lead_weeks": 1.0,
+        "n_lead_districts": 335
+      },
+      "background": {
+        "alert_district_weeks": 1381,
+        "background_district_weeks": 108216,
+        "background_rate": 0.0128
+      }
+    },
+    "zscore": {
+      "delta": {
+        "alert_district_weeks": 2355,
+        "window_district_weeks": 8535,
+        "flag_rate_in_window": 0.2759,
+        "district_coverage": 0.7512,
+        "districts_alerted": 631,
+        "median_lead_weeks": 4.0,
+        "n_lead_districts": 631
+      },
+      "omicron": {
+        "alert_district_weeks": 1341,
+        "window_district_weeks": 9961,
+        "flag_rate_in_window": 0.1346,
+        "district_coverage": 0.5833,
+        "districts_alerted": 490,
+        "median_lead_weeks": 2.0,
+        "n_lead_districts": 490
+      },
+      "background": {
+        "alert_district_weeks": 10021,
+        "background_district_weeks": 108216,
+        "background_rate": 0.0926
+      }
+    }
+  }
+}
