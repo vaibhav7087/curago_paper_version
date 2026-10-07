@@ -1,0 +1,43 @@
+{
+  "data_source": "CDC NHAMCS 2019 ED (n=13595)",
+  "split": {
+    "seed": 42,
+    "n_train": 8157,
+    "n_cal": 2719,
+    "n_test": 2719,
+    "threshold": 0.173139,
+    "n_cal_pos": 414
+  },
+  "xgboost_test": {
+    "recall": 0.913,
+    "precision": 0.187,
+    "auc": 0.7386,
+    "brier": 0.1575,
+    "abstention_rate": 0.231
+  },
+  "bootstrap_95ci": {
+    "recall": [
+      0.8864,
+      0.9402
+    ],
+    "precision": [
+      0.1691,
+      0.2025
+    ],
+    "auc": [
+      0.7126,
+      0.7658
+    ]
+  },
+  "bootstrap_resamples": 1000,
+  "news2_baseline": {
+    "cutoff": 5,
+    "matched_recall_feasible": false,
+    "cal_recall": 0.1425,
+    "test_recall": 0.1377,
+    "test_precision": 0.2073,
+    "cutoff1_test_recall": 0.6691,
+    "cutoff1_test_precision": 0.1683,
+    "test_missing_vitals_rows": 456
+  }
+}
