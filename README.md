@@ -44,6 +44,18 @@ jupyter notebook ds/notebooks/
 - No ProMED / WHO-PDF ingestion anywhere (see `docs/citations.md` for why).
 - Inference code (`ds/predict.py`) is pure local sklearn — no network calls.
 
+## Submission deliverables
+
+| Deliverable | File(s) | Generator |
+|---|---|---|
+| IEEE paper (5 pp., 13 refs) | `paper/main.tex` · `main.pdf` · `main.md` · `main.docx` | `paper\build.bat`, `paper/export_md.py`, `paper/export_docx.py` |
+| Presentation deck (11 slides) | `ppt/paper_presentation.pptx` | `node ppt/make_deck.js` |
+| Rubric self-scoring loop | `paper/selfscore_v1..v3.md` (88 → 92 → 98, gate passed) | manual, evidence-backed |
+| Automated audits | `python paper/audit.py` → ALL PASS | numbers / cites / originality / honesty / format |
+
+Every number in every format resolves from `ds/models/paper/paper_numbers.json`
+(seeded, fail-closed pipeline) — nothing is hand-typed.
+
 ## Citations
 
 See `docs/citations.md` (dataset licenses, rejected sources, acknowledgments).
