@@ -18,8 +18,9 @@ missing. Raw files are gitignored; derived artifacts in `ds/models/` are committ
 | Item | Value |
 |---|---|
 | URL | `https://www.kaggle.com/datasets/milanzdravkovic/pharma-sales-data` |
-| File | `salesmonthly.csv` (2014–2019 monthly, ATC columns M01AB…R06) |
+| File | `salesmonthly.csv` (Jan 2014 – Oct 2019, 70 monthly rows, ATC columns M01AB…R06) |
 | Place here | `ds/data/raw/salesmonthly.csv` |
+| Partial-month exclusion | Oct 2019 excluded by the trainer (all-drug total 539 vs median 1793 — partial collection upstream); 69 usable months, 12-step holdout = Oct 2018 – Sep 2019 |
 | Access | **Manual download — Kaggle login required** |
 | No-login mirror (used here) | `mcallara/pharma-sales-data` (`salesmonthly.csv`, 6,908 bytes, blob `851bcec`). Mirror README restates CC BY-NC 4.0 + Kaggle attribution — license chain verified 2026-10-07 |
 | License | **CC BY-NC 4.0** (Milan Zdravković) — attribution in `docs/citations.md`; non-commercial use only |

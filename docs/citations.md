@@ -13,8 +13,10 @@
 2. **Pharma sales dataset** (F2 demand forecast)
    - Milan Zdravković, "Pharma sales data", Kaggle,
      `https://www.kaggle.com/datasets/milanzdravkovic/pharma-sales-data`
-   - Six years (2014–2019) of point-of-sale transactional data resampled to
-     monthly aggregates, 8 ATC categories.
+   - Six years of point-of-sale transactional data resampled to monthly
+     aggregates, 8 ATC categories. File as obtained: Jan 2014 – Oct 2019
+     (70 monthly rows); Oct 2019 is a partial collection month and is excluded
+     by the trainer's documented trailing-month guard (69 usable months).
    - License: **Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** —
      `https://creativecommons.org/licenses/by-nc/4.0/`
    - Obligations met by this citation; non-commercial research/hackathon use is

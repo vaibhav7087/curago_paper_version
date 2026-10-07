@@ -2,44 +2,71 @@
 
 All numbers below are read straight from the committed artifacts in `ds/models/`.
 Rerunning any trainer on the raw data from `ds/data/README.md` reproduces them
-exactly (verified: F2/F3 rerun → zero `git diff`; F1 rerun → identical CSVs).
+exactly (verified: F1/F2/F3 reruns → identical CSVs/pkls; SHAP PNG has minor
+render jitter across runs, data identical — original rendering kept).
 
-## F1 — triage severity (`metric_table.csv`, CDC NHAMCS 2019 ED, n=13,595)
+## F1 — triage severity (CDC NHAMCS 2019 ED, n=13,595)
+
+Baseline at default 0.5 threshold (`metric_table.csv`, 5-fold CV — no held-out
+test set; CV means reported):
 
 | Model | AUC-ROC | Recall | Precision | F1 | Under-triage |
 |---|---|---|---|---|---|
 | Logistic Regression (baseline) | 0.719 | 0.609 | 0.269 | 0.373 | 0.391 |
 | XGBoost (class-weighted) | 0.732 | 0.513 | 0.334 | 0.405 | 0.487 |
 
-Reading: XGBoost wins on AUC/F1, but **under-triages more** (0.487 vs 0.391) —
-reported as-is. A recall-tuned operating threshold is the natural next step and
-is explicitly future work, not a claimed result.
+Tuned operating point (`operating_point.json` + `threshold_tradeoff.csv`,
+rule: lowest threshold with out-of-fold recall ≥ 0.80, tie-break max precision;
+AUC unchanged — tuning moves along the ROC curve):
 
-## F2 — demand forecast (`demand_forecast_metrics.csv`, 12-step holdout MAE)
+| Model | Threshold | Recall | Precision | Under-triage | Over-triage | Abstention |
+|---|---|---|---|---|---|---|
+| Logistic Regression | 0.40 | 0.811 | 0.214 | 0.189 | 0.786 | 0.394 |
+| XGBoost (wired into `predict.py`) | 0.25 | 0.845 | 0.207 | 0.155 | 0.793 | 0.235 |
+
+Reading: tuning cuts XGB under-triage 0.487 → 0.155 at the cost of over-triage
+0.666 → 0.793 (precision 0.334 → 0.207). The abstain rule
+(`max(proba) < 0.60`) is unchanged; 23.5% of XGB cases abstain at the tuned
+point. Both operating points are reported — this is the standard
+sensitivity-first tradeoff of triage, not metric inflation.
+
+Top RFV drivers decoded in `docs/rfv_codebook.md` (official NCHS labels).
+
+## F2 — demand forecast (12-step holdout MAE, single holdout — no rolling CV)
+
+69 usable months (Jan 2014 – Sep 2019; Oct 2019 excluded as a partial collection
+month, documented in the trainer). Holdout = Oct 2018 – Sep 2019.
+(`demand_forecast_metrics.csv`):
 
 | Best model per drug | Drugs |
 |---|---|
-| Seasonal naive (3/8) | M01AB, M01AE, N02BE |
-| Holt-Winters (3/8) | N05C, R03, R06 |
-| LightGBM (2/8) | N02BA, N05B |
+| Seasonal naive (2/8) | M01AB (16.31), N02BE (151.64) |
+| Holt-Winters (4/8) | M01AE (21.89), N05C (4.72), R03 (66.54), R06 (19.75) |
+| LightGBM (2/8) | N02BA (9.87), N05B (35.63) |
 
-Correction: an earlier commit message said "naive wins 4/8" — the artifact shows
-**3/8** (N05B goes to LightGBM, 50.54 < 50.78). The CSV was always correct; this
-file is the corrected record. Finding: a naive baseline is competitive — worth
-stating in the paper, not hiding.
+History note: an earlier commit message said "naive wins 4/8" — that run
+included the partial Oct-2019 month in the holdout, contaminating every MAE.
+After the documented exclusion the tally above (from the artifact) is correct.
+Finding stands: naive baselines are competitive on 2/8 drugs — stated, not hidden.
 
 ## F3 — outbreak detection (IsolationForest, contamination=0.05)
 
 - Input: 126,712 district-weeks, 840 state-qualified districts, 2020-04-26–2023-08-22.
-- Flagged: 6,336/126,712 (5.0% — by construction of the contamination parameter).
-- Interpretation for the paper: retrospective spike flagging on a static archive,
-  not live surveillance. Precision/recall against labeled outbreak events is not
-  claimed — no labeled ground truth was available.
+- Flagged: 6,336/126,712 (5.0% — by construction of the contamination parameter;
+  never presented as a detection rate).
+- Delta-window evaluation (`outbreak_delta_eval.json`, window 2021-04-01–2021-06-30,
+  descriptive enrichment — no labeled ground truth exists, so no precision/recall
+  is claimed):
+  - flag rate inside window: **0.2496** vs **0.0356** outside (~7x enrichment);
+  - district coverage: **334/840 (39.8%)** districts flagged at least once in-window.
+- Interpretation: retrospective spike flagging on a static archive, not live
+  surveillance. Flagged weeks listed in `outbreak_flagged_weeks.csv`.
 
 ## QA note (2026-10-07)
 
-- Fail-closed verified: hiding `ds/data/raw/` makes all three trainers exit 1
-  with download instructions.
-- Determinism verified: rerunning F2/F3 produces zero `git diff` vs committed artifacts.
+- Fail-closed verified: hiding `ds/data/raw/` makes all trainers (and the tuner)
+  exit 1 with download instructions.
+- Determinism verified: reruns reproduce committed CSVs/pkls/JSON byte-identically.
 - License chain verified: Kaggle page (CC BY-NC 4.0) → mirror README restates it →
-  `docs/citations.md` attributes → metric CSVs carry the license tag.
+  `docs/citations.md` attributes → metric CSVs carry the license tag. Project code
+  is MIT (`LICENSE`); data terms are unaffected.

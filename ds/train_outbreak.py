@@ -64,7 +64,13 @@ def main():
     joblib.dump(iso, MODEL_DIR / "outbreak_iso.pkl")
     with open(MODEL_DIR / "outbreak_features.json", "w") as f:
         json.dump(features, f)
-    print("Saved outbreak_iso.pkl + outbreak_features.json")
+    # Evidence artifact: every flagged district-week (small; full frame stays in raw).
+    # Enables the Delta-window evaluation in ds/evaluate_outbreak.py.
+    flagged = df.loc[df["is_outbreak"] == 1,
+                     ["district", "week", "case_count", "disease"]].copy()
+    flagged.to_csv(MODEL_DIR / "outbreak_flagged_weeks.csv", index=False)
+    print("Saved outbreak_iso.pkl + outbreak_features.json + "
+          f"outbreak_flagged_weeks.csv ({len(flagged)} rows)")
 
 
 if __name__ == "__main__":

@@ -14,10 +14,11 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).parent / "models"
 _triage_model = None
 _triage_features = None
+_triage_threshold = 0.5  # fallback; tuned value lives in operating_point.json
 
 
 def _load_triage_model():
-    global _triage_model, _triage_features
+    global _triage_model, _triage_features, _triage_threshold
     if _triage_model is None:
         pkl_path = MODEL_DIR / "triage.pkl"
         feat_path = MODEL_DIR / "triage_features.json"
@@ -26,6 +27,12 @@ def _load_triage_model():
             with open(feat_path) as f:
                 _triage_features = json.load(f)
             print(f"Triage model loaded: {len(_triage_features)} features")
+            op_path = MODEL_DIR / "operating_point.json"
+            if op_path.exists():
+                with open(op_path) as f:
+                    op = json.load(f)
+                _triage_threshold = float(op.get(op.get("selected_model", "xgboost"), {}).get("threshold", 0.5))
+                print(f"Tuned operating point: threshold={_triage_threshold}")
         else:
             print(f"Triage model not found at {pkl_path}")
     return _triage_model, _triage_features
@@ -105,10 +112,11 @@ def predict_severity(patient_data: dict) -> dict:
     try:
         proba = model.predict_proba(X)[0]  # [P(low), P(high)]
         confidence = float(max(proba))
-        predicted_class = int(model.predict(X)[0])
-        predicted_severity = "High" if predicted_class == 1 else "Low"
+        # Tuned operating point (ds/tune_threshold.py); default 0.5 if unset.
+        predicted_severity = "High" if float(proba[1]) >= _triage_threshold else "Low"
 
-        # Abstain if confidence is too low
+        # Abstain if confidence is too low (rule unchanged by tuning;
+        # abstention rate at the tuned point is reported in operating_point.json)
         abstain = confidence < 0.60
 
         # Get feature importances (from the XGBoost model inside the pipeline)
@@ -125,6 +133,7 @@ def predict_severity(patient_data: dict) -> dict:
             "confidence": round(confidence, 3),
             "model_used": "xgboost_cdc_nhamcs",
             "abstain": abstain,
+            "threshold_used": _triage_threshold,
             "feature_contributions": feature_contributions
         }
     except Exception as e:

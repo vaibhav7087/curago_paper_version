@@ -1,0 +1,22 @@
+{
+  "logreg": {
+    "threshold": 0.4,
+    "expected_recall": 0.8111,
+    "expected_precision": 0.2138,
+    "expected_f1": 0.3384,
+    "expected_under_triage": 0.1889,
+    "expected_over_triage": 0.7862,
+    "abstention_rate": 0.3943
+  },
+  "xgboost": {
+    "threshold": 0.25,
+    "expected_recall": 0.8449,
+    "expected_precision": 0.207,
+    "expected_f1": 0.3325,
+    "expected_under_triage": 0.1551,
+    "expected_over_triage": 0.793,
+    "abstention_rate": 0.2349
+  },
+  "rule": "lowest threshold with OOF recall>=0.8, tie-break max precision",
+  "selected_model": "xgboost"
+}

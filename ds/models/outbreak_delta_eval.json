@@ -1,0 +1,15 @@
+{
+  "delta_window": [
+    "2021-04-01",
+    "2021-06-30"
+  ],
+  "district_weeks_in_window": 8535,
+  "flagged_in_window": 2130,
+  "flag_rate_in_window": 0.2496,
+  "district_weeks_outside_window": 118177,
+  "flagged_outside_window": 4206,
+  "flag_rate_outside_window": 0.0356,
+  "districts_total": 840,
+  "districts_with_flag_in_window": 334,
+  "district_coverage_in_window": 0.3976
+}

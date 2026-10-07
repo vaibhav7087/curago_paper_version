@@ -15,6 +15,7 @@ import json
 import joblib
 import numpy as np
 import pandas as pd
+import pyreadstat
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -89,8 +90,6 @@ def prepare_nhamcs(df):
 
 
 def main():
-    global pyreadstat
-    import pyreadstat
     from sklearn.model_selection import StratifiedKFold, cross_validate
     from sklearn.linear_model import LogisticRegression
     from sklearn.impute import SimpleImputer

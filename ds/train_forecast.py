@@ -46,7 +46,22 @@ def load_real():
         )
     if len(df) < 24:
         raise ValueError(f"Need >=24 monthly rows for 12-step holdout, got {len(df)}")
-    print(f"Loaded {RAW} rows={len(df)} drugs={DRUGS} ({DATA_SOURCE_LABEL})")
+    # Drop trailing partial months: the source file's final month (Oct 2019) has
+    # ~70-90% lower sales across ALL drugs vs September (partial data collection
+    # upstream — the mirror states "no changes" to the Kaggle original, so this
+    # quirk is inherited, not introduced). A trailing month below 50% of the
+    # median all-drug monthly total is excluded and disclosed, never imputed.
+    totals = df[DRUGS].sum(axis=1)
+    median_total = float(totals.median())
+    while len(df) > 24 and float(totals.iloc[-1]) < 0.5 * median_total:
+        dropped = df.iloc[-1]["date"].date()
+        print(f"Excluding trailing partial month {dropped} "
+              f"(total={float(totals.iloc[-1]):.1f} vs median={median_total:.1f})")
+        df = df.iloc[:-1]
+        totals = df[DRUGS].sum(axis=1)
+    print(f"Loaded {RAW} rows={len(df)} "
+          f"({df['date'].min().date()}..{df['date'].max().date()}) "
+          f"drugs={DRUGS} ({DATA_SOURCE_LABEL})")
     return df[["date"] + DRUGS]
 
 
