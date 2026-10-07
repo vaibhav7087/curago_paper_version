@@ -1,0 +1,4 @@
+Method,Recall,Recall 95% CI,Precision,Precision 95% CI,AUC,AUC 95% CI,Brier,Abstention,Matches 0.85 target?,Data Source
+XGBoost + conformal (seed-42 test),0.913,"[0.886, 0.940]",0.187,"[0.169, 0.203]",0.739,"[0.713, 0.766]",0.158,0.231,Yes,"CDC NHAMCS 2019 ED (n=13,595)"
+"NEWS2 vitals-only, cutoff >=5",0.138,,0.207,,,,,,No,"CDC NHAMCS 2019 ED (n=13,595)"
+"NEWS2 vitals-only, cutoff >=1 (max recall)",0.669,,0.168,,,,,,No,"CDC NHAMCS 2019 ED (n=13,595)"

@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\caption{Monthly demand forecast, MAE on the 12-step holdout (supplementary). Holt-Winters wins 4/8, seasonal naive 2/8, LightGBM 2/8 — naive baselines are competitive.}
+\label{tab:forecast}
+\begin{tabular}{lrrrlr}
+\toprule
+Drug & Seasonal naive & Holt-Winters & LightGBM & Best & Data Source \\
+\midrule
+M01AB & 16.31 & 19.11 & 19.28 & Seasonal Naive & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+M01AE & 22.72 & 21.89 & 23.55 & Holt-Winters & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+N02BA & 12.76 & 13.1 & 9.87 & LightGBM & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+N02BE & 151.64 & 162.84 & 197.99 & Seasonal Naive & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+N05B & 39.12 & 46.52 & 35.63 & LightGBM & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+N05C & 8.75 & 4.72 & 9.18 & Holt-Winters & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+R03 & 74.25 & 66.54 & 92.05 & Holt-Winters & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+R06 & 27.58 & 19.75 & 23.74 & Holt-Winters & Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0) \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}\raggedright\footnotesize \textbf{Data source:} Kaggle milanzdravkovic/pharma-sales-data (CC BY-NC 4.0).
+\end{table}

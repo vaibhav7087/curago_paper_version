@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\caption{Operating points for the triage module: default, tuned (pre-declared recall $\geq 0.80$ rule) and split-conformal (seed 42).}
+\label{tab:operating_points}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Operating point & Threshold & Recall & Precision & Under-triage & Abstention & AUC & Data Source \\
+\midrule
+XGBoost, t=0.50 (OOF) & 0.5 & 0.513 & 0.334 & 0.487 & 0.235 & 0.732 & CDC NHAMCS 2019 ED (n=13,595) \\
+XGBoost, t=0.25 tuned (OOF) & 0.25 & 0.845 & 0.207 & 0.155 & 0.235 & 0.732 & CDC NHAMCS 2019 ED (n=13,595) \\
+LogReg, t=0.40 tuned (OOF) & 0.4 & 0.811 & 0.214 & 0.189 & 0.394 & 0.719 & CDC NHAMCS 2019 ED (n=13,595) \\
+XGBoost, conformal, seed-42 test & 0.173 & 0.913 & 0.187 & 0.087 & 0.231 & 0.739 & CDC NHAMCS 2019 ED (n=13,595) \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}\raggedright\footnotesize \textbf{Data source:} CDC NHAMCS 2019 ED (n=13,595). AUC is threshold-independent (5-fold CV); OOF = out-of-fold.
+\end{table}

@@ -1,0 +1,56 @@
+{
+  "module1_triage": {
+    "auc_logreg_cv": 0.719,
+    "auc_xgb_cv": 0.732,
+    "conformal_alpha": 0.15,
+    "conformal_frac_below_085": 0.46,
+    "conformal_mean_abstention": 0.218,
+    "conformal_mean_recall": 0.85,
+    "conformal_mean_threshold": 0.212,
+    "conformal_n_seeds": 200,
+    "conformal_sd_recall": 0.027,
+    "n_analysis": 13595,
+    "n_raw": 19481,
+    "news2_cutoff1_precision": 0.168,
+    "news2_cutoff1_recall": 0.669,
+    "news2_cutoff5_precision": 0.207,
+    "news2_cutoff5_recall": 0.138,
+    "news2_matches_085": false,
+    "prevalence": 0.152,
+    "seed42_abstention": 0.231,
+    "seed42_auc": 0.739,
+    "seed42_brier": 0.158,
+    "seed42_precision": 0.187,
+    "seed42_recall": 0.913,
+    "seed42_recall_ci95": [
+      0.886,
+      0.94
+    ],
+    "seed42_threshold": 0.173,
+    "tuned_xgb_abstention": 0.235,
+    "tuned_xgb_precision": 0.207,
+    "tuned_xgb_recall": 0.845,
+    "tuned_xgb_threshold": 0.25,
+    "tuned_xgb_under_triage": 0.155,
+    "xgb_cv_t05_recall": 0.513,
+    "xgb_cv_t05_under_triage": 0.487
+  },
+  "module2_outbreak": {
+    "delta_enrichment": 7.011,
+    "delta_outside_flag_rate": 0.036,
+    "district_weeks": 126712,
+    "districts": 840,
+    "iso_confirmed_background_rate": 0.013,
+    "iso_single_background_rate": 0.024,
+    "iso_single_delta_coverage": 0.398,
+    "iso_single_delta_flag_rate": 0.25,
+    "iso_single_delta_lead_weeks": 2.0,
+    "zscore_background_rate": 0.093
+  },
+  "supplement_forecast": {
+    "hw_wins": 4,
+    "lgbm_wins": 2,
+    "months_analyzed": 69,
+    "naive_wins": 0
+  }
+}

@@ -1,0 +1,7 @@
+Method,Window,In-window flag rate,District coverage,Median lead (weeks),Background rate,Data Source
+iso_single,Delta,0.25,0.398,2.0,0.024,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+iso_single,Omicron,0.167,0.525,2.0,0.024,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+iso_confirmed,Delta,0.199,0.324,1.0,0.013,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+iso_confirmed,Omicron,0.116,0.399,1.0,0.013,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+zscore,Delta,0.276,0.751,4.0,0.093,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
+zscore,Omicron,0.135,0.583,2.0,0.093,"covid19india static archive (data.incovid19.org, retrieved 2026-10-07)"
