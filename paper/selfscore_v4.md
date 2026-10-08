@@ -96,7 +96,7 @@ clean — only legitimate CSV data rows remain).
 | 4 | Originality | 15 | 5 | 15 | yes | 0 flagged duplicated 10-grams after whitelist; duplicate intro/discussion sentences deduplicated in T1; all three text formats derive from one source |
 | 5 | Honesty/accuracy of claims | 10 | 5 | 10 | yes | 10/10 mandated disclosures locked to observed values (marginal vs per-split, PAC 3.5%, descriptive enrichment, Brier-vs-constant, exchangeability/transfer, synthetic absence, Holt-Winters, NEWS2, cross-fitting); threshold-rule and abstention-band prose now match code exactly |
 | 6 | Readability/clarity | 10 | 5 | 10 | no | §III-B/§III-C rewritten around the actual protocol; captions de-echoed; math exports cleanly to MD/DOCX; abstract restructured; deck notes align with paper wording |
-| 7 | Results completeness | 10 | 4 | 8 | no | Nested cross-fitting, AUC CIs, FPR columns, marginal-vs-PAC grid, Brier-vs-constant all in main body; SHAP/calibration/cohort/NEWS2/forecast as referenced artifacts; byline placeholder (user choice) — only remaining deduction |
+| 7 | Results completeness | 10 | 4 | 8 | no | Nested cross-fitting, AUC CIs, FPR columns, marginal-vs-PAC grid, Brier-vs-constant all in main body; SHAP/calibration/cohort/NEWS2/forecast as referenced artifacts; byline now set (Kadam, Gandhi, Shinolikar — Bylance Technologies, no email per author); remaining deduction: supplementary figures live as repo artifacts by space budget |
 | | **Total** | 100 | | **98** | | |
 
 ## Gate check
@@ -109,8 +109,16 @@ clean — only legitimate CSV data rows remain).
 
 ## Remaining non-blocking items
 
-1. Placeholder byline (user's decision — replace before hard copy 9 Oct if
-   real names become available).
-2. T4 (outcome labels) and T5 (surveillance baselines) explicitly out of
+1. T4 (outcome labels) and T5 (surveillance baselines) explicitly out of
    approved scope — not started.
-3. Legacy `.doc` not emitted; DOCX is the editable submission format.
+2. Legacy `.doc` not emitted; DOCX is the editable submission format.
+
+## Addendum (2026-10-08, byline)
+
+Placeholder byline replaced with the real one — **Vaibhav Kadam, Tanvi
+Gandhi, Omkar Shinolikar — Bylance Technologies, India** (no email, author
+decision) — in `main.tex` and the deck title slide (`make_deck.js`,
+`pres.author`). Rebuilt: paper 6 pp, audit ALL PASS with
+`authors_placeholder_flagged: false`; `main.md`/`main.docx` regenerated;
+deck re-exported to `paper_presentation.pdf` (11 slides, PDF text-validated:
+all three names + Bylance present, no "Author One"/"Placeholder").

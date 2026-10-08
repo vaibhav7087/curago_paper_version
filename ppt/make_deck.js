@@ -42,7 +42,7 @@ const shadow = () => ({ type: 'outer', color: '7FA8AC', blur: 7, offset: 2, angl
 
 const pres = new pptxgen();
 pres.layout = 'LAYOUT_WIDE'; /* 13.33 x 7.5 */
-pres.author = 'Placeholder Department';
+pres.author = 'Vaibhav Kadam, Tanvi Gandhi, Omkar Shinolikar';
 pres.subject = 'Nexathon II paper presentation';
 pres.title = 'Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance';
 
@@ -91,7 +91,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   s.addShape(ST.ellipse, { x: 11.4, y: 4.9, w: 3.6, h: 3.6, fill: { color: MINT, transparency: 80 }, line: { type: 'none' } });
   s.addText('Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance',
     { x: 0.9, y: 1.75, w: 11.2, h: 1.95, fontFace: HEAD, fontSize: 36, bold: true, color: WHITE, margin: 0 });
-  s.addText('Author One, Author Two  \u00B7  Placeholder Department, Placeholder Institute, City, India',
+  s.addText('Vaibhav Kadam  \u00B7  Tanvi Gandhi  \u00B7  Omkar Shinolikar  \u00B7  Bylance Technologies',
     { x: 0.9, y: 3.9, w: 11.2, h: 0.4, fontFace: BODY, fontSize: 15.5, color: ICE, margin: 0 });
   s.addText('Nexathon II  \u00B7  Paper Presentation  \u00B7  AIKTC  \u00B7  9 October 2026',
     { x: 0.9, y: 4.42, w: 11.2, h: 0.4, fontFace: BODY, fontSize: 15, bold: true, color: MINT, margin: 0 });
@@ -101,7 +101,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   chip(s, x0, 6.1, cw, 0.6, 'IEEE 6-page paper, 13 references', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, fs: 12 });
   chip(s, x0 + cw + gap, 6.1, cw, 0.6, 'Seed-42 byte-identical reruns', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, gtxt: '#', fs: 12 });
   chip(s, x0 + 2 * (cw + gap), 6.1, cw, 0.6, 'Fail-closed data pipeline', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, gtxt: '!', fs: 12 });
-  s.addNotes('Opening: two everyday decisions on a rural telemedicine platform, answered only with public data. Byline is a placeholder in the current draft.');
+  s.addNotes('Opening: two everyday decisions on a telemedicine platform, answered only with public data. Byline: Vaibhav Kadam, Tanvi Gandhi, Omkar Shinolikar (Bylance Technologies).');
 }
 
 /* ================================================================ S2 problem */

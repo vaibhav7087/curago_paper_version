@@ -50,7 +50,7 @@ the gap list that drives the next iteration.
 
 | File | Purpose |
 |---|---|
-| `main.tex` | IEEEtran conference draft (placeholder byline) |
+| `main.tex` | IEEEtran conference draft (byline: Kadam, Gandhi, Shinolikar — Bylance Technologies) |
 | `numbers.tex` | GENERATED — macro-per-number from `paper_numbers.json` |
 | `make_numbers.py` | JSON → `numbers.tex` generator (+ `--check`) |
 | `build.bat` | deterministic build (MiKTeX on PATH) |

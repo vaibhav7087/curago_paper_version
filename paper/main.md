@@ -2,7 +2,7 @@
 
 # Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance
 
-**Author One, Author Two** — Placeholder Department, Placeholder Institute, City, India, {author.one, author.two}@example.com
+**Vaibhav Kadam, Tanvi Gandhi, Omkar Shinolikar** — Bylance Technologies, India
 
 ## Abstract
 
