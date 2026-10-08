@@ -50,6 +50,7 @@ jupyter notebook ds/notebooks/
 |---|---|---|
 | IEEE paper (6 pp., 13 refs) | `paper/main.tex` · `main.pdf` · `main.md` · `main.docx` | `paper\build.bat`, `paper/export_md.py`, `paper/export_docx.py` |
 | Presentation deck (11 slides) | `ppt/paper_presentation.pptx` · `paper_presentation.pdf` | `node ppt/make_deck.js` (+ COM PDF export) |
+| IEEE-template deck (23 slides, ICFACT structure) | `ppt/ieee_presentation.pptx` · `ieee_presentation.pdf` | `node ppt/make_ieee_deck.js` (+ COM PDF export) |
 | Rubric self-scoring loop | `paper/selfscore_v1..v4.md` (88 → 92 → 98 → 98, review T1–T3 closed, gate passed) | manual, evidence-backed |
 | Automated audits | `python paper/audit.py` → ALL PASS | numbers / cites / originality / honesty / format |
 
