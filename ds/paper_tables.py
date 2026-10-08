@@ -49,8 +49,12 @@ def r3(x):
 
 
 def esc(s: str) -> str:
-    for a, b in [("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"),
-                 ("$", r"\$"), ("#", r"\#"), ("_", r"\_")]:
+    s = str(s)
+    # cells are authored LaTeX: pass math/LaTeX through untouched; escape
+    # only characters that break text-mode table cells
+    if "$" in s or "\\" in s:
+        return s
+    for a, b in [("&", r"\&"), ("%", r"\%"), ("#", r"\#"), ("_", r"\_")]:
         s = s.replace(a, b)
     return s
 
@@ -101,6 +105,8 @@ def main():
                             "run python ds/tune_threshold.py").read_text())
     extras = json.loads(require(MODEL_DIR / "severity_extras.json",
                                 "run python ds/severity_eval_extras.py").read_text())
+    oof_stats = json.loads(require(MODEL_DIR / "triage_oof_stats.json",
+                                   "run python ds/train_triage.py").read_text())
     repeats = pd.read_csv(require(MODEL_DIR / "conformal_repeats.csv",
                                   "run python ds/conformal_triage.py"))
     sweep = pd.read_csv(require(MODEL_DIR / "conformal_alpha_sweep.csv",
@@ -120,121 +126,192 @@ def main():
     assert len(weekly) == 126712, f"unexpected district-weeks={len(weekly)}"
 
     # ------------------------------------------------- T1: triage model (5-fold CV)
+    def mt_row(label: str):
+        m = metric[metric.Model == label]
+        assert len(m) == 1, f"metric_table row missing/duplicated: {label}"
+        return m.iloc[0]
+
     t1 = metric.rename(columns={
         "Model": "Model", "AUC-ROC": "AUC", "Recall (Sensitivity)": "Recall",
         "Precision": "Precision", "F1 Score": "F1",
-        "Under-Triage Rate": "Under-triage"})[
-        ["Model", "AUC", "Recall", "Precision", "F1", "Under-triage", "Data Source"]]
-    for c in ["AUC", "Recall", "Precision", "F1", "Under-triage"]:
+        "Under-Triage Rate": "Under-triage", "Brier (OOF)": "Brier"})[
+        ["Model", "AUC", "Recall", "Precision", "F1", "Under-triage", "Brier",
+         "Data Source"]]
+    for c in ["AUC", "Recall", "Precision", "F1", "Under-triage", "Brier"]:
         t1[c] = t1[c].map(r3)
     t1["Data Source"] = SRC_NHAMCS_SHORT
-    assert r3(float(metric.loc[metric.Model.str.startswith("XGBoost"),
-                               "AUC-ROC"].iloc[0])) == 0.732, "XGB AUC claim drift"
-    assert r3(float(metric.loc[metric.Model.str.startswith("Logistic"),
-                               "AUC-ROC"].iloc[0])) == 0.719, "LogReg AUC claim drift"
+    # claim locks (5-fold CV, seed 42)
+    assert r3(mt_row("XGBoost (class-weighted)")["AUC-ROC"]) == 0.732, "XGB weighted AUC drift"
+    assert r3(mt_row("Logistic Regression (baseline)")["AUC-ROC"]) == 0.719, "LogReg AUC drift"
+    assert r3(mt_row("XGBoost (unweighted)")["AUC-ROC"]) == 0.743, "XGB unweighted AUC drift"
+    assert r3(mt_row("XGBoost (unweighted + isotonic)")["AUC-ROC"]) == 0.742, "XGB primary AUC drift"
+    assert r3(mt_row("XGBoost (unweighted + isotonic)")["Brier (OOF)"]) == 0.113, "primary Brier drift"
+    assert r3(mt_row("Constant (train prevalence)")["Brier (OOF)"]) == 0.129, "constant Brier drift"
+    assert r3(mt_row("XGBoost (class-weighted)")["Brier (OOF)"]) == 0.165, "weighted Brier drift"
     emit("paper_T1_triage_models", t1,
-         "Triage model comparison, 5-fold cross-validation (t=0.5, seed 42).",
-         "tab:triage_models", "lrrrrrr",
+         "Triage model comparison, 5-fold cross-validation ($t=0.5$, seed 42), "
+         "with out-of-fold Brier scores. The constant row predicts each "
+         "training fold's prevalence; it is the Brier reference the calibrated "
+         "primary model must beat.",
+         "tab:triage_models", "lrrrrrrc",
          f"\\textbf{{Data source:}} {SRC_NHAMCS}.", span=True)
 
     # ----------------------------------------------- T2: operating points (abstain)
     x50 = trade[(trade.model == "xgboost") & (trade.threshold == 0.50)].iloc[0]
     x25 = op["xgboost"]
     l40 = op["logreg"]
+    nx = op["nested_xgboost"]
+    nxp = nx["pooled"]
     se = extras["xgboost_test"]
-    assert abs(x25["expected_recall"] - trade[(trade.model == "xgboost") &
-               (trade.threshold == 0.25)].iloc[0]["recall"]) < 0.001, "t=0.25 drift"
-    assert (r3(x25["expected_recall"]), r3(x25["expected_under_triage"]),
-            r3(x25["expected_precision"]), r3(x25["abstention_rate"])) == \
-        (0.845, 0.155, 0.207, 0.235), "tuned operating-point claim drift"
+    auc_pooled = r3(oof_stats["oof_auc"]["xgb_unw_isotonic"])
+    auc_logreg_pooled = r3(oof_stats["oof_auc"]["logreg"])
+    # claim locks: pooled tuned point, nested cross-fitted headline, logreg
+    assert (r3(x25["threshold"]), r3(x25["expected_recall"]),
+            r3(x25["expected_precision"]), r3(x25["expected_fpr"]),
+            r3(x25["expected_under_triage"])) == (0.11, 0.8, 0.226, 0.493, 0.2), \
+        "tuned operating-point claim drift"
+    assert (r3(nxp["recall"]), r3(nxp["precision"]), r3(nxp["fpr"]),
+            r3(nxp["under_triage"])) == (0.829, 0.214, 0.545, 0.172), \
+        "nested claim drift"
+    assert nx["thresholds"] == [0.09, 0.1, 0.1, 0.1, 0.09], "nested t drift"
     assert (r3(l40["expected_recall"]), r3(l40["threshold"])) == (0.811, 0.4), \
         "logreg tuned claim drift"
-    assert r3(se["recall"]) == 0.913 and r3(se["brier"]) == 0.158, "seed-42 drift"
+    assert (r3(se["recall"]), r3(se["precision"]), r3(se["fpr"])) == \
+        (0.886, 0.199, 0.643), "seed-42 claim drift"
+    nx_t = nx["thresholds"]
+    nx_t_str = f"{np.mean(nx_t):.3f} [{min(nx_t):.2f}, {max(nx_t):.2f}]"
     rows = [
-        {"Operating point": "XGBoost, t=0.50 (OOF)", "Threshold": 0.50,
+        {"Operating point": "Primary, t=0.50 (pooled OOF)", "Threshold": 0.50,
          "Recall": r3(x50["recall"]), "Precision": r3(x50["precision"]),
+         "FPR": r3(x50["fpr"]),
          "Under-triage": r3(x50["under_triage"]),
-         "Abstention": r3(x50["abstention_rate"]), "AUC": r3(0.7318710637)},
-        {"Operating point": "XGBoost, t=0.25 tuned (OOF)", "Threshold": 0.25,
+         "Abstention": r3(x50["abstention_rate"]), "AUC": auc_pooled},
+        {"Operating point": "Primary, tuned (pooled OOF)",
+         "Threshold": r3(x25["threshold"]),
          "Recall": r3(x25["expected_recall"]), "Precision": r3(x25["expected_precision"]),
+         "FPR": r3(x25["expected_fpr"]),
          "Under-triage": r3(x25["expected_under_triage"]),
-         "Abstention": r3(x25["abstention_rate"]), "AUC": r3(0.7318710637)},
-        {"Operating point": "LogReg, t=0.40 tuned (OOF)", "Threshold": 0.40,
+         "Abstention": r3(x25["abstention_rate"]), "AUC": auc_pooled},
+        {"Operating point": "Primary, cross-fitted (headline)",
+         "Threshold": nx_t_str,
+         "Recall": r3(nxp["recall"]), "Precision": r3(nxp["precision"]),
+         "FPR": r3(nxp["fpr"]), "Under-triage": r3(nxp["under_triage"]),
+         "Abstention": r3(nxp["abstention_rate"]), "AUC": r3(nxp["auc"])},
+        {"Operating point": "LogReg, tuned (pooled OOF)",
+         "Threshold": r3(l40["threshold"]),
          "Recall": r3(l40["expected_recall"]), "Precision": r3(l40["expected_precision"]),
+         "FPR": r3(l40["expected_fpr"]),
          "Under-triage": r3(l40["expected_under_triage"]),
-         "Abstention": r3(l40["abstention_rate"]), "AUC": r3(0.7193058568)},
-        {"Operating point": "XGBoost, conformal, seed-42 test", "Threshold":
-            r3(extras["split"]["threshold"]), "Recall": r3(se["recall"]),
-         "Precision": r3(se["precision"]), "Under-triage": r3(1 - se["recall"]),
+         "Abstention": r3(l40["abstention_rate"]), "AUC": auc_logreg_pooled},
+        {"Operating point": "Primary, conformal, seed-42 test",
+         "Threshold": r3(extras["split"]["threshold"]), "Recall": r3(se["recall"]),
+         "Precision": r3(se["precision"]), "FPR": r3(se["fpr"]),
+         "Under-triage": r3(1 - se["recall"]),
          "Abstention": r3(se["abstention_rate"]), "AUC": r3(se["auc"])},
     ]
     t2 = pd.DataFrame(rows)
     t2["Data Source"] = SRC_NHAMCS_SHORT
     emit("paper_T2_operating_points", t2,
-         "Operating points for the triage module: default, tuned (pre-declared "
-         "recall $\\geq 0.80$ rule) and split-conformal (seed 42).",
-         "tab:operating_points", "lrrrrrrr",
-         f"\\textbf{{Data source:}} {SRC_NHAMCS}. AUC is threshold-independent "
-         "(5-fold CV); OOF = out-of-fold.", span=True)
+         "Operating points for the triage module: default, tuned "
+         "(pre-declared rule: max precision among thresholds with OOF recall "
+         "$\\geq 0.80$), the nested cross-fitted evaluation, and "
+         "split-conformal (seed 42).",
+         "tab:operating_points", "llrrrrrrc",
+         f"\\textbf{{Data source:}} {SRC_NHAMCS}. AUC is "
+         "threshold-independent; OOF = out-of-fold; cross-fitted rows tune on "
+         "inner folds and evaluate on held-out outer folds.", span=True)
 
     # --------------------------------------------------- T3: threshold sweep (suppl)
     keep = {0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.70, 0.90}
     t3 = trade[trade.threshold.isin(keep)].copy()
     t3["Model"] = t3["model"].map({"logreg": "Logistic regression",
-                                   "xgboost": "XGBoost"})
+                                   "xgboost": "Primary (XGB+isotonic)"})
     t3 = t3.rename(columns={"threshold": "Threshold", "recall": "Recall",
-                            "precision": "Precision", "under_triage": "Under-triage",
+                            "precision": "Precision", "fpr": "FPR",
+                            "under_triage": "Under-triage",
                             "over_triage": "Over-triage",
                             "abstention_rate": "Abstention"})[
-        ["Model", "Threshold", "Recall", "Precision", "Under-triage", "Over-triage",
-         "Abstention", "Data Source"]]
-    for c in ["Threshold", "Recall", "Precision", "Under-triage", "Over-triage",
-              "Abstention"]:
+        ["Model", "Threshold", "Recall", "Precision", "FPR", "Under-triage",
+         "Over-triage", "Abstention", "Data Source"]]
+    for c in ["Threshold", "Recall", "Precision", "FPR", "Under-triage",
+              "Over-triage", "Abstention"]:
         t3[c] = t3[c].map(r3)
     t3 = t3.sort_values(["Model", "Threshold"], kind="mergesort").reset_index(drop=True)
     assert len(t3) > 0, "threshold sweep empty"
     emit("paper_T3_threshold_sweep", t3,
-         "Threshold sweep (OOF): recall$/$precision$/$triage rates and abstention "
-         "as a function of the decision threshold.",
-         "tab:threshold_sweep", "llrrrrrr",
+         "Threshold sweep (OOF): recall$/$precision$/$FPR$/$triage rates and "
+         "abstention as a function of the decision threshold.",
+         "tab:threshold_sweep", "lrrrrrrrc",
          f"\\textbf{{Data source:}} {SRC_NHAMCS}.")
 
     # ------------------------------------------------------- T4: conformal results
     main_alpha = 0.15
+    from conformal_triage import PAC_DELTA
     mr = repeats["test_recall"]
+    pr_ = repeats["pac_test_recall"]
     rec_mean, rec_sd = mr.mean(), mr.std(ddof=1)
+    pac_mean, pac_sd = pr_.mean(), pr_.std(ddof=1)
     pct_below = (mr < 0.85).mean()
-    assert r3(rec_mean) == 0.850, f"conformal mean recall drift: {rec_mean}"
-    assert r3(pct_below) == 0.46, f"below-target share drift: {pct_below}"
-    assert round(repeats["threshold"].mean(), 2) == 0.21, "mean threshold drift"
-    assert round(repeats["test_abstention_rate"].mean(), 2) == 0.22, "mean abstention drift"
+    pac_pct_below = (pr_ < 0.85).mean()
+    # claim locks (alpha=0.15, 200 seeds, primary model)
+    assert (r3(rec_mean), r3(rec_sd), r3(pct_below)) == \
+        (0.884, 0.033, 0.125), f"marginal claim drift: {r3(rec_mean)}"
+    assert (r3(pac_mean), r3(pac_sd), r3(pac_pct_below)) == \
+        (0.9, 0.03, 0.035), f"PAC claim drift: {r3(pac_mean)}"
+    assert pac_pct_below <= PAC_DELTA, "PAC delta violated empirically"
+    assert r3(repeats["threshold"].mean()) == 0.094, "mean threshold drift"
+    assert r3(repeats["test_abstention_rate"].mean()) == 0.043, "mean abstention drift"
+    assert r3(repeats["pac_threshold"].mean()) == 0.089, "PAC mean threshold drift"
+    assert r3(repeats["test_precision"].mean()) == 0.196, "marginal precision drift"
+    assert r3(repeats["pac_test_precision"].mean()) == 0.191, \
+        "PAC precision drift"
 
-    claim_means = {0.05: 0.953, 0.10: 0.902, 0.15: 0.850, 0.20: 0.800, 0.30: 0.700}
-    claim_precs = {0.05: 0.171, 0.10: 0.185, 0.15: 0.198, 0.20: 0.212, 0.30: 0.241}
+    claim_marg_means = {0.05: 0.966, 0.10: 0.924, 0.15: 0.884, 0.20: 0.832, 0.30: 0.737}
+    claim_marg_precs = {0.05: 0.169, 0.10: 0.183, 0.15: 0.196, 0.20: 0.212, 0.30: 0.243}
+    claim_pac_means = {0.05: 0.976, 0.10: 0.938, 0.15: 0.9, 0.20: 0.858, 0.30: 0.768}
+    claim_pac_precs = {0.05: 0.164, 0.10: 0.179, 0.15: 0.191, 0.20: 0.204, 0.30: 0.233}
     rows = []
     for a, g in sweep.groupby("alpha"):
+        target = 1.0 - a
         m, s = g["test_recall"].mean(), g["test_recall"].std(ddof=1)
-        assert abs(m - claim_means[a]) < 0.001, f"sweep recall drift alpha={a}: {m}"
-        assert abs(g["test_precision"].mean() - claim_precs[a]) < 0.001, \
-            f"sweep precision drift alpha={a}"
+        pm, ps = g["pac_test_recall"].mean(), g["pac_test_recall"].std(ddof=1)
+        frac_m = (g["test_recall"] < target).mean()
+        frac_p = (g["pac_test_recall"] < target).mean()
+        assert r3(m) == claim_marg_means[a], f"sweep marginal recall drift alpha={a}: {r3(m)}"
+        assert r3(g["test_precision"].mean()) == claim_marg_precs[a], \
+            f"sweep marginal precision drift alpha={a}"
+        assert r3(pm) == claim_pac_means[a], f"sweep PAC recall drift alpha={a}: {r3(pm)}"
+        assert r3(g["pac_test_precision"].mean()) == claim_pac_precs[a], \
+            f"sweep PAC precision drift alpha={a}"
+        assert frac_p <= PAC_DELTA + 1e-9, f"PAC below-target share > delta at alpha={a}"
         if abs(a - main_alpha) < 1e-9:
             assert abs(m - rec_mean) < 1e-6, "sweep/repeats alpha=.15 mismatch"
-        rows.append({"alpha (miss target)": r3(a), "Mean recall": r3(m),
-                     "SD": r3(s), "Min": r3(g["test_recall"].min()),
-                     "Max": r3(g["test_recall"].max()),
-                     "Frac. splits <0.85": r3((g["test_recall"] < 0.85).mean()),
+            assert abs(pm - pac_mean) < 1e-6, "sweep/repeats PAC alpha=.15 mismatch"
+        rows.append({"alpha (miss target)": r3(a), "Rule": "marginal",
+                     "Mean recall": r3(m), "SD": r3(s),
+                     "Frac. below $1-\\alpha$": r3(frac_m),
                      "Mean precision": r3(g["test_precision"].mean())})
-    t4 = pd.DataFrame(rows).sort_values("alpha (miss target)",
-                                        kind="mergesort").reset_index(drop=True)
+        rows.append({"alpha (miss target)": r3(a),
+                     "Rule": f"PAC ($\\delta$={PAC_DELTA})",
+                     "Mean recall": r3(pm), "SD": r3(ps),
+                     "Frac. below $1-\\alpha$": r3(frac_p),
+                     "Mean precision": r3(g["pac_test_precision"].mean())})
+    t4 = pd.DataFrame(rows).sort_values(
+        ["alpha (miss target)", "Rule"],
+        key=lambda c: c.map({"marginal": 0}) if c.name == "Rule" else c,
+        kind="mergesort").reset_index(drop=True)
     t4["Data Source"] = SRC_NHAMCS
-    assert len(t4) == 5 and len(repeats) == 200, "conformal table shape drift"
+    assert len(t4) == 10 and len(repeats) == 200, "conformal table shape drift"
     emit("paper_T4_conformal", t4,
          "Split-conformal recall control over 200 random 60$/$20$/$20 splits "
-         "(XGBoost, calibration quantile on positives). The guarantee is marginal: "
-         "individual splits vary.",
-         "tab:conformal", "lrrrrrrr",
-         f"\\textbf{{Data source:}} {SRC_NHAMCS}. Alpha 0.15 is the pre-declared "
-         "main setting (also conformal\\_repeats.csv, 200 seeds).", span=True)
+         "(primary XGBoost$+$isotonic; calibration quantile on positives). "
+         "Marginal: textbook $k=\\lfloor\\alpha(n+1)\\rfloor$ rule, average "
+         "guarantee. PAC: Beta order-statistic rank at "
+         f"$\\delta$={PAC_DELTA}, bounding the below-target share per split.",
+         "tab:conformal", "llrrrrc",
+         f"\\textbf{{Data source:}} {SRC_NHAMCS}. Alpha 0.15 is the "
+         "pre-declared main setting (also conformal\\_repeats.csv, 200 seeds).",
+         span=True)
 
     # ------------------------------------- T5: seed-42 test + NEWS2 baseline (suppl)
     def ci_str(key):
@@ -247,8 +324,13 @@ def main():
     assert (r3(news["cutoff1_test_recall"]), r3(news["cutoff1_test_precision"])) == \
         (0.669, 0.168), "NEWS2 cutoff1 claim drift"
     assert news["matched_recall_feasible"] is False, "NEWS2 feasibility drift"
+    # seed-42 primary claim locks (marginal conformal at alpha=0.15)
+    assert (r3(se["recall"]), r3(se["precision"]), r3(se["fpr"]),
+            r3(se["auc"]), r3(se["brier"]),
+            r3(se["brier_constant_trainprev"])) == \
+        (0.886, 0.199, 0.643, 0.755, 0.112, 0.129), "seed-42 extras drift"
     t5 = pd.DataFrame([
-        {"Method": "XGBoost + conformal (seed-42 test)",
+        {"Method": "Primary + conformal (seed-42 test)",
          "Recall": r3(se["recall"]), "Recall 95% CI": ci_str("recall"),
          "Precision": r3(se["precision"]), "Precision 95% CI": ci_str("precision"),
          "AUC": r3(se["auc"]), "AUC 95% CI": ci_str("auc"),
@@ -270,7 +352,9 @@ def main():
          "Seed-42 split-conformal test performance (bootstrap 95\\% CIs, 1000 "
          "resamples) versus the NEWS2 vitals-only baseline. No NEWS2 cutoff "
          "$\\geq$1 reaches 0.85 recall on calibration, so a matched comparison "
-         "is infeasible (documented).",
+         "is infeasible (documented). Brier of the calibrated primary model: "
+         f"{r3(se['brier'])} vs {r3(se['brier_constant_trainprev'])} for a "
+         "constant predictor at the train-split prevalence.",
          "tab:severity_baseline", "lrrrrrrrrlc",
          f"\\textbf{{Data source:}} {SRC_NHAMCS}.")
 
@@ -380,37 +464,68 @@ def main():
          f"\\textbf{{Data source:}} {SRC_KAGGLE}.")
 
     # ------------------------------------------------------------ paper_numbers.json
+    from triage_models import LABELS as M_LABELS, PRIMARY
+    pri = mt_row(M_LABELS[PRIMARY])
+    wtd = mt_row(M_LABELS["xgb_weighted"])
+    con = mt_row(M_LABELS["constant"])
+    x50f = trade[(trade.model == "xgboost") & (trade.threshold == 0.50)].iloc[0]
     numbers = {
         "module1_triage": {
             "n_analysis": int(len(cohort)),
             "n_raw": RAW_NHAMCS_N,
             "prevalence": r3(prev),
-            "auc_xgb_cv": r3(metric.loc[metric.Model.str.startswith("XGBoost"),
-                                        "AUC-ROC"].iloc[0]),
-            "auc_logreg_cv": r3(metric.loc[metric.Model.str.startswith("Logistic"),
-                                            "AUC-ROC"].iloc[0]),
-            "xgb_cv_t05_recall": r3(metric.loc[metric.Model.str.startswith("XGBoost"),
-                                               "Recall (Sensitivity)"].iloc[0]),
-            "xgb_cv_t05_under_triage": r3(metric.loc[metric.Model.str.startswith(
-                "XGBoost"), "Under-Triage Rate"].iloc[0]),
+            "auc_xgb_cv": r3(pri["AUC-ROC"]),
+            "auc_xgb_weighted_cv": r3(wtd["AUC-ROC"]),
+            "auc_logreg_cv": r3(mt_row(M_LABELS["logreg"])["AUC-ROC"]),
+            "auc_xgb_ci95": [r3(v) for v in oof_stats["auc_ci95"]["xgb_unw_isotonic"]],
+            "auc_logreg_ci95": [r3(v) for v in oof_stats["auc_ci95"]["logreg"]],
+            "auc_diff_ci95": [r3(v) for v in
+                              oof_stats["auc_diff_primary_minus_logreg_ci95"]],
+            "xgb_cv_t05_recall": r3(pri["Recall (Sensitivity)"]),
+            "xgb_cv_t05_under_triage": r3(pri["Under-Triage Rate"]),
+            "xgb_cv_t05_fpr": r3(x50f["fpr"]),
+            "brier_primary_oof": r3(pri["Brier (OOF)"]),
+            "brier_weighted_oof": r3(wtd["Brier (OOF)"]),
+            "brier_constant_oof": r3(con["Brier (OOF)"]),
+            "brier_isotonic_oof": round(float(pri["Brier (OOF)"]), 4),
+            "brier_platt_oof": round(float(mt_row(M_LABELS["xgb_unw_platt"])
+                                           ["Brier (OOF)"]), 4),
             "tuned_xgb_threshold": r3(x25["threshold"]),
             "tuned_xgb_recall": r3(x25["expected_recall"]),
             "tuned_xgb_precision": r3(x25["expected_precision"]),
+            "tuned_xgb_fpr": r3(x25["expected_fpr"]),
             "tuned_xgb_under_triage": r3(x25["expected_under_triage"]),
             "tuned_xgb_abstention": r3(x25["abstention_rate"]),
+            "nested_threshold_mean": r3(float(np.mean(nx_t))),
+            "nested_threshold_min": r3(min(nx_t)),
+            "nested_threshold_max": r3(max(nx_t)),
+            "nested_recall": r3(nxp["recall"]),
+            "nested_precision": r3(nxp["precision"]),
+            "nested_fpr": r3(nxp["fpr"]),
+            "nested_under_triage": r3(nxp["under_triage"]),
+            "nested_abstention": r3(nxp["abstention_rate"]),
             "conformal_alpha": 0.15,
             "conformal_mean_recall": r3(rec_mean),
             "conformal_sd_recall": r3(rec_sd),
             "conformal_frac_below_085": r3(pct_below),
             "conformal_mean_threshold": r3(repeats["threshold"].mean()),
             "conformal_mean_abstention": r3(repeats["test_abstention_rate"].mean()),
+            "conformal_mean_precision": r3(repeats["test_precision"].mean()),
             "conformal_n_seeds": int(len(repeats)),
+            "pac_delta": PAC_DELTA,
+            "pac_mean_recall": r3(pac_mean),
+            "pac_sd_recall": r3(pac_sd),
+            "pac_frac_below_085": r3(pac_pct_below),
+            "pac_mean_threshold": r3(repeats["pac_threshold"].mean()),
+            "pac_mean_precision": r3(repeats["pac_test_precision"].mean()),
             "seed42_threshold": r3(extras["split"]["threshold"]),
             "seed42_recall": r3(se["recall"]),
             "seed42_recall_ci95": [r3(v) for v in extras["bootstrap_95ci"]["recall"]],
             "seed42_precision": r3(se["precision"]),
+            "seed42_fpr": r3(se["fpr"]),
             "seed42_auc": r3(se["auc"]),
             "seed42_brier": r3(se["brier"]),
+            "seed42_brier_constant": r3(se["brier_constant_trainprev"]),
             "seed42_abstention": r3(se["abstention_rate"]),
             "news2_cutoff5_recall": r3(news["test_recall"]),
             "news2_cutoff5_precision": r3(news["test_precision"]),
@@ -464,9 +579,15 @@ Kaggle pharma sales (CC BY-NC 4.0, supplementary).
 **Fig. 2 (fig1, `paper_fig1_roc.png`, label `fig:roc`)** — Triage ROC under
 5-fold cross-validation ({numbers['module1_triage']['n_analysis']:,} analysis
 encounters): LogReg AUC {numbers['module1_triage']['auc_logreg_cv']:.3f},
-XGBoost AUC {numbers['module1_triage']['auc_xgb_cv']:.3f}. Marked operating
-points: XGB t=0.50 (FPR 0.18, TPR 0.51), tuned t=0.25 (0.58, 0.84), and the
-seed-42 conformal split (0.71, 0.91). Data: CDC NHAMCS 2019 ED.
+primary XGBoost+isotonic AUC
+{numbers['module1_triage']['auc_xgb_cv']:.3f} (95% CI
+{numbers['module1_triage']['auc_xgb_ci95'][0]:.3f}--{numbers['module1_triage']['auc_xgb_ci95'][1]:.3f}).
+Marked operating points: t=0.50 (FPR {numbers['module1_triage']['xgb_cv_t05_fpr']:.3f},
+TPR {numbers['module1_triage']['xgb_cv_t05_recall']:.3f}), tuned t={numbers['module1_triage']['tuned_xgb_threshold']:.2f}
+({numbers['module1_triage']['tuned_xgb_fpr']:.3f},
+{numbers['module1_triage']['tuned_xgb_recall']:.3f}), and the seed-42
+conformal split ({numbers['module1_triage']['seed42_fpr']:.3f},
+{numbers['module1_triage']['seed42_recall']:.3f}). Data: CDC NHAMCS 2019 ED.
 
 **Fig. 3 (fig2, `paper_fig2_shap.png`, label `fig:shap`)** — SHAP summary for
 the XGBoost triage model: age, pulse, respiratory rate and pain scale dominate;
@@ -474,15 +595,19 @@ reason-for-visit codes contribute through clinical-pattern splits. Data: CDC
 NHAMCS 2019 ED.
 
 **Fig. 4 (fig3, `paper_fig3_tradeoff.png`, label `fig:tradeoff`)** — OOF
-threshold trade-offs (recall, precision, under-/over-triage, abstention) with
-the pre-declared selections t=0.40 (LogReg) and t=0.25 (XGBoost). Data: CDC
-NHAMCS 2019 ED.
+threshold trade-offs (recall, precision, FPR, under-/over-triage, abstention)
+with the pre-declared selections t=0.40 (LogReg) and
+t={numbers['module1_triage']['tuned_xgb_threshold']:.2f} (primary pooled).
+Data: CDC NHAMCS 2019 ED.
 
 **Fig. 5 (fig4, `paper_fig4_conformal_hist.png`, label `fig:conformal`)** —
-Split-conformal test recall over 200 seeds at alpha=0.15: mean
-{numbers['module1_triage']['conformal_mean_recall']:.3f} vs the 0.85 target;
-{100 * numbers['module1_triage']['conformal_frac_below_085']:.0f}% of individual
-splits fall below target — the guarantee is marginal, not per-split. Data: CDC
+Split-conformal test recall over 200 seeds at alpha=0.15: marginal rule mean
+{numbers['module1_triage']['conformal_mean_recall']:.3f} vs the 0.85 target,
+with {100 * numbers['module1_triage']['conformal_frac_below_085']:.1f}% of
+individual splits below target; the PAC rule (delta
+{numbers['module1_triage']['pac_delta']:g}) raises the mean to
+{numbers['module1_triage']['pac_mean_recall']:.3f} and cuts the below-target
+share to {100 * numbers['module1_triage']['pac_frac_below_085']:.1f}%. Data: CDC
 NHAMCS 2019 ED.
 
 **Fig. 6 (fig5, `paper_fig5_outbreak.png`, label `fig:outbreak`)** —
@@ -496,33 +621,43 @@ LightGBM, MAE in legend). Data: Kaggle pharma sales (CC BY-NC 4.0).
 
 **Suppl. Fig. S1b (figS1b, `paper_figS1b_calibration.png`,
 label `fig:calibration`)** — Reliability diagram, seed-42 test (Brier
-{numbers['module1_triage']['seed42_brier']:.4f}): the model is overconfident;
-probabilities are rank-useful for the threshold rule, not quoted as risks.
-Data: CDC NHAMCS 2019 ED.
+{numbers['module1_triage']['seed42_brier']:.4f} vs
+{numbers['module1_triage']['seed42_brier_constant']:.4f} for a constant at the
+train-split prevalence): isotonic calibration improves on the constant
+baseline; probabilities drive the threshold rule, not quoted as risks. Data:
+CDC NHAMCS 2019 ED.
 
 ## Tables (`ds/models/paper/paper_T*.csv` + `.tex`)
 
 **Table I (T1, label `tab:triage_models`)** — Triage model comparison, 5-fold
-CV (t=0.5): XGBoost AUC {numbers['module1_triage']['auc_xgb_cv']:.3f} vs LogReg
-{numbers['module1_triage']['auc_logreg_cv']:.3f}; XGB under-triage
-{numbers['module1_triage']['xgb_cv_t05_under_triage']:.3f} at default
-threshold. Data: CDC NHAMCS 2019 ED.
+CV (t=0.5): primary XGBoost+isotonic AUC
+{numbers['module1_triage']['auc_xgb_cv']:.3f} vs LogReg
+{numbers['module1_triage']['auc_logreg_cv']:.3f}; OOF Brier
+{numbers['module1_triage']['brier_primary_oof']:.3f} vs
+{numbers['module1_triage']['brier_constant_oof']:.3f} for a constant predictor;
+under-triage {numbers['module1_triage']['xgb_cv_t05_under_triage']:.3f} at the
+default threshold. Data: CDC NHAMCS 2019 ED.
 
 **Table II (T2, label `tab:operating_points`)** — Operating points: default
-t=0.50, tuned t=0.25 (recall {numbers['module1_triage']['tuned_xgb_recall']:.3f},
-under-triage {numbers['module1_triage']['tuned_xgb_under_triage']:.3f}),
-LogReg t=0.40, and conformal seed-42 (recall
-{numbers['module1_triage']['seed42_recall']:.3f}). Data: CDC NHAMCS 2019 ED.
+t=0.50, tuned t={numbers['module1_triage']['tuned_xgb_threshold']:.2f} (recall
+{numbers['module1_triage']['tuned_xgb_recall']:.3f}, FPR
+{numbers['module1_triage']['tuned_xgb_fpr']:.3f}), cross-fitted nested
+(recall {numbers['module1_triage']['nested_recall']:.3f}, FPR
+{numbers['module1_triage']['nested_fpr']:.3f}), LogReg t=0.40, and conformal
+seed-42 (recall {numbers['module1_triage']['seed42_recall']:.3f}). Data: CDC
+NHAMCS 2019 ED.
 
 **Table III (T3, label `tab:threshold_sweep`)** — OOF threshold sweep for both
 models (supplementary). Data: CDC NHAMCS 2019 ED.
 
 **Table IV (T4, label `tab:conformal`)** — Conformal recall across 200 splits
-per alpha; mean recall
-{numbers['module1_triage']['conformal_mean_recall']:.3f} at alpha=0.15 with
-SD {numbers['module1_triage']['conformal_sd_recall']:.3f}; fraction of splits
-below 0.85 = {numbers['module1_triage']['conformal_frac_below_085']:.3f}.
-Data: CDC NHAMCS 2019 ED.
+per alpha, marginal vs PAC rules; at alpha=0.15 marginal mean
+{numbers['module1_triage']['conformal_mean_recall']:.3f} (SD
+{numbers['module1_triage']['conformal_sd_recall']:.3f}) with
+{100 * numbers['module1_triage']['conformal_frac_below_085']:.1f}% of splits
+below target vs PAC mean {numbers['module1_triage']['pac_mean_recall']:.3f}
+with {100 * numbers['module1_triage']['pac_frac_below_085']:.1f}% below. Data:
+CDC NHAMCS 2019 ED.
 
 **Table V (T5, label `tab:severity_baseline`)** — Seed-42 conformal test
 performance with bootstrap 95% CIs versus the NEWS2 vitals-only baseline; no

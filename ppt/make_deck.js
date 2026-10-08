@@ -44,7 +44,7 @@ const pres = new pptxgen();
 pres.layout = 'LAYOUT_WIDE'; /* 13.33 x 7.5 */
 pres.author = 'Placeholder Department';
 pres.subject = 'Nexathon II paper presentation';
-pres.title = 'Real-Data Machine Learning for Rural Telemedicine Triage and Outbreak Surveillance';
+pres.title = 'Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance';
 
 const card = (s, x, y, w, h, fill = CARD) =>
   s.addShape(ST.roundRect, { x, y, w, h, fill: { color: fill }, line: { color: LINE, width: 0.75 }, rectRadius: 0.08, shadow: shadow() });
@@ -89,7 +89,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   s.background = { color: DARK };
   s.addShape(ST.ellipse, { x: 9.4, y: -2.2, w: 7.2, h: 7.2, fill: { color: SEAFOAM, transparency: 86 }, line: { type: 'none' } });
   s.addShape(ST.ellipse, { x: 11.4, y: 4.9, w: 3.6, h: 3.6, fill: { color: MINT, transparency: 80 }, line: { type: 'none' } });
-  s.addText('Real-Data Machine Learning for Rural Telemedicine Triage and Outbreak Surveillance',
+  s.addText('Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance',
     { x: 0.9, y: 1.75, w: 11.2, h: 1.95, fontFace: HEAD, fontSize: 36, bold: true, color: WHITE, margin: 0 });
   s.addText('Author One, Author Two  \u00B7  Placeholder Department, Placeholder Institute, City, India',
     { x: 0.9, y: 3.9, w: 11.2, h: 0.4, fontFace: BODY, fontSize: 15.5, color: ICE, margin: 0 });
@@ -98,7 +98,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   s.addText('Public real-world data only  \u00B7  no synthetic records  \u00B7  released for exact reproduction',
     { x: 0.9, y: 4.94, w: 11.2, h: 0.4, fontFace: BODY, fontSize: 13.5, italic: true, color: ICE, margin: 0 });
   const cw = 3.62, gap = 0.2, x0 = 0.9;
-  chip(s, x0, 6.1, cw, 0.6, 'IEEE 5-page paper, 13 references', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, fs: 12 });
+  chip(s, x0, 6.1, cw, 0.6, 'IEEE 6-page paper, 13 references', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, fs: 12 });
   chip(s, x0 + cw + gap, 6.1, cw, 0.6, 'Seed-42 byte-identical reruns', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, gtxt: '#', fs: 12 });
   chip(s, x0 + 2 * (cw + gap), 6.1, cw, 0.6, 'Fail-closed data pipeline', { fill: DARK2, linec: DARK2, txtc: WHITE, gfill: MINT, gtxt: '!', fs: 12 });
   s.addNotes('Opening: two everyday decisions on a rural telemedicine platform, answered only with public data. Byline is a placeholder in the current draft.');
@@ -158,7 +158,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   card(s, x, 1.35, w, 2.1);
   glyph(s, x + 0.22, 1.58, '1', { size: 0.44, fill: PRIMARY, color: WHITE, fs: 14 });
   s.addText('Module 1 \u2014 patient triage', { x: x + 0.78, y: 1.58, w: w - 1.0, h: 0.44, fontFace: BODY, fontSize: 15.5, bold: true, color: INK, valign: 'middle', margin: 0 });
-  s.addText('Class-weighted XGBoost risk score \u2192 tuned operating threshold \u2192 abstention for uncertain cases \u2192 split-conformal recall control at \u03B1 = ' + fx('module1_triage.conformal_alpha', 2) + '.',
+  s.addText('Calibrated XGBoost (isotonic) risk score \u2192 cross-fitted tuned threshold \u2192 abstention for uncertain cases \u2192 PAC split-conformal recall control at \u03B1 = ' + fx('module1_triage.conformal_alpha', 2) + '.',
     { x: x + 0.22, y: 2.12, w: w - 0.44, h: 1.2, fontFace: BODY, fontSize: 12.5, color: INK2, margin: 0 });
   card(s, x, 3.65, w, 2.1);
   glyph(s, x + 0.22, 3.88, '2', { size: 0.44, fill: SEAFOAM, color: WHITE, fs: 14 });
@@ -180,32 +180,37 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   s.addText('Cross-validated ROC, seed 42 \u2014 regenerated from ds/paper_figures.py.',
     { x: 0.75, y: 6.28, w: 6.25, h: 0.3, fontFace: BODY, fontSize: 10.5, italic: true, color: MUTED, margin: 0 });
   const x1 = 7.4, x2 = 10.3, w = 2.75, h = 2.5, y1 = 1.35, y2 = 4.05;
-  stat(s, x1, y1, w, h, { value: fx('module1_triage.auc_xgb_cv'), label: 'XGBoost CV AUC', sub: 'vs ' + fx('module1_triage.auc_logreg_cv') + ' for the logistic baseline [6]' });
-  stat(s, x2, y1, w, h, { value: pc('module1_triage.tuned_xgb_under_triage'), label: 'under-triage at t = ' + fx('module1_triage.tuned_xgb_threshold', 2), sub: 'down from ' + pc('module1_triage.xgb_cv_t05_under_triage') + ' at the default t = 0.05' });
-  stat(s, x1, y2, w, h, { value: fx('module1_triage.tuned_xgb_recall'), label: 'recall at the chosen point', sub: 'precision ' + fx('module1_triage.tuned_xgb_precision') + ' under heavy class imbalance', valColor: SEAFOAM });
-  stat(s, x2, y2, w, h, { value: pc('module1_triage.tuned_xgb_abstention'), label: 'abstention rate', sub: 'uncertain cases deferred to a human instead of forced', valColor: SEAFOAM });
+  const aucCI = v('module1_triage.auc_xgb_ci95');
+  stat(s, x1, y1, w, h, { value: fx('module1_triage.auc_xgb_cv'), label: 'primary model CV AUC', sub: 'vs ' + fx('module1_triage.auc_logreg_cv') + ' logistic; 95% CI [' + aucCI[0] + ', ' + aucCI[1] + ']' });
+  stat(s, x2, y1, w, h, { value: pc('module1_triage.nested_under_triage'), label: 'under-triage, cross-fitted', sub: 'down from ' + pc('module1_triage.xgb_cv_t05_under_triage') + ' at default t = 0.50; FPR ' + fx('module1_triage.nested_fpr') });
+  stat(s, x1, y2, w, h, { value: fx('module1_triage.nested_recall'), label: 'recall at the chosen point', sub: 'precision ' + fx('module1_triage.nested_precision') + '; thresholds ' + fx('module1_triage.nested_threshold_min', 2) + '\u2013' + fx('module1_triage.nested_threshold_max', 2) + ' per outer fold', valColor: SEAFOAM });
+  stat(s, x2, y2, w, h, { value: fx('module1_triage.brier_primary_oof'), label: 'OOF Brier, isotonic', sub: 'beats ' + fx('module1_triage.brier_constant_oof') + ' for a constant \u2014 calibration holds', valColor: SEAFOAM });
   slideNum(s, 5);
-  s.addNotes('Under-triage is the metric the platform cares about; the tuned threshold cuts it by roughly two thirds while keeping recall high. Abstention makes the residual uncertainty explicit.');
+  s.addNotes('Under-triage is the metric the platform cares about: the default t=0.5 threshold with a calibrated model is far too conservative (85.9% under-triage), so cross-fitted threshold selection is the lever. The nested estimate tunes each outer fold on the other four only \u2014 no test-fold peeking. Brier below the constant baseline means the probabilities are calibrated enough to threshold.');
 }
 
 /* ================================================================ S6 conformal */
 {
   const s = pres.addSlide();
-  title(s, 'Split-conformal recall control \u2014 and its honest cost');
+  title(s, 'Split-conformal recall control \u2014 marginal vs PAC');
   s.addShape(ST.roundRect, { x: 0.6, y: 1.3, w: 6.0, h: 4.0, fill: { color: WHITE }, line: { color: LINE, width: 0.75 }, rectRadius: 0.08, shadow: shadow() });
   img(s, 'paper_fig4_conformal_hist.png', 0.72, 1.42, 5.76, 3.76);
-  s.addText('Recall distribution over ' + nfmt('module1_triage.conformal_n_seeds') + ' random splits, \u03B1 = ' + fx('module1_triage.conformal_alpha', 2) + '.',
+  s.addText('Recall distribution over ' + nfmt('module1_triage.conformal_n_seeds') + ' random splits, both rules, \u03B1 = ' + fx('module1_triage.conformal_alpha', 2) + '.',
     { x: 0.6, y: 5.36, w: 6.0, h: 0.3, fontFace: BODY, fontSize: 10.5, italic: true, color: MUTED, margin: 0 });
   s.addShape(ST.roundRect, { x: 6.9, y: 1.3, w: 5.83, h: 4.0, fill: { color: WHITE }, line: { color: LINE, width: 0.75 }, rectRadius: 0.08, shadow: shadow() });
   img(s, 'paper_fig3_tradeoff.png', 7.02, 1.42, 5.59, 3.76);
   s.addText('Threshold\u2013coverage trade-off, split means \u00B1 SD.',
     { x: 6.9, y: 5.36, w: 5.83, h: 0.3, fontFace: BODY, fontSize: 10.5, italic: true, color: MUTED, margin: 0 });
-  chip(s, 0.6, 5.9, 12.13, 0.95,
-    'Marginal, not per-patient: mean recall ' + fx('module1_triage.conformal_mean_recall') + ' (SD ' + fx('module1_triage.conformal_sd_recall') + '), yet ' + pc('module1_triage.conformal_frac_below_085', 0) +
-    ' of splits fall below the 0.85 target \u2014 we report the failures rather than average them away.',
-    { fill: AMBERBG, linec: 'E8D5AC', txtc: AMBER, gfill: AMBER, gtxt: '!', gcolor: WHITE, fs: 13, bold: true });
+  chip(s, 0.6, 5.9, 6.0, 0.95,
+    'Marginal rule: mean recall ' + fx('module1_triage.conformal_mean_recall') + ' (SD ' + fx('module1_triage.conformal_sd_recall') + '), yet ' + pc('module1_triage.conformal_frac_below_085', 1) +
+    ' of splits fall below the 0.85 target \u2014 average-case only.',
+    { fill: AMBERBG, linec: 'E8D5AC', txtc: AMBER, gfill: AMBER, gtxt: '!', gcolor: WHITE, fs: 12.5, bold: true });
+  chip(s, 6.73, 5.9, 6.0, 0.95,
+    'PAC rule (\u03B4 = ' + pc('module1_triage.pac_delta', 0) + '): mean recall ' + fx('module1_triage.pac_mean_recall') +
+    ', below-target splits cut to ' + pc('module1_triage.pac_frac_below_085', 1) + ' at precision ' + fx('module1_triage.pac_mean_precision') + '.',
+    { fill: WHITE, gfill: MINT, fs: 12.5, bold: true });
   slideNum(s, 6);
-  s.addNotes('This is the honesty centrepiece: the conformal layer restores a statistical guarantee, but it is marginal across splits, and 46% of splits miss the nominal target. Stated in abstract, results and conclusion.');
+  s.addNotes('The honest core: the textbook conformal rule is marginal \u2014 12.5% of the 200 splits miss the nominal 0.85 target. The PAC (Beta order-statistic) rule buys a per-split-style bound: below-target share drops to 3.5% (within delta=10%) with slightly higher mean recall; the price is a lower threshold and precision 0.191 vs 0.196. Both rules are stated in the abstract, results and conclusion.');
 }
 
 /* ================================================================ S7 outbreak */
@@ -231,11 +236,11 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
 {
   const s = pres.addSlide();
   title(s, 'What we do not claim');
-  row(s, 1.3, '!', 'Marginal, not per-patient', 'Conformal recall control guarantees the population of splits; ' + pc('module1_triage.conformal_frac_below_085', 0) + ' of them sat below the 0.85 target (mean ' + fx('module1_triage.conformal_mean_recall') + ').', { gc: AMBERBG, gtxt: '!' });
+  row(s, 1.3, '!', 'Guarantees rest on exchangeability', 'The marginal rule is average-case (' + pc('module1_triage.conformal_frac_below_085', 1) + ' of splits below target); PAC bounds that share at \u03B4 = ' + pc('module1_triage.pac_delta', 0) + ', but neither survives distribution shift.', { gc: AMBERBG, gtxt: '!' });
   row(s, 2.45, '2', 'Transfer is unproven', 'Trained on US NHAMCS emergency-department data; rural Indian telemedicine casemix and workflow differ. External validation is future work, not a result.', { gc: AMBERBG, gtxt: '2' });
-  row(s, 3.6, '3', 'Probabilities are overconfident', 'Brier score ' + fx('module1_triage.seed42_brier') + ' at seed 42: discrimination is solid, calibration is not \u2014 do not read scores as risk percentages.', { gc: AMBERBG, gtxt: '3' });
+  row(s, 3.6, '3', 'Calibrated, not oracular', 'Isotonic Brier ' + fx('module1_triage.brier_primary_oof') + ' beats the constant ' + fx('module1_triage.brier_constant_oof') + ' \u2014 but probabilities are not validated absolute risks; they drive thresholds, not quotations.', { gc: AMBERBG, gtxt: '3' });
   row(s, 4.75, '4', 'Outbreak detection is descriptive', 'IsolationForest enrichment is retrospective description at a 5% budget; naive baselines and NEWS2 stay competitive (cutoff 1: precision ' + fx('module1_triage.news2_cutoff1_precision') + ', recall ' + fx('module1_triage.news2_cutoff1_recall') + ').', { gc: AMBERBG, gtxt: '4' });
-  chip(s, 0.6, 6.15, 12.13, 0.66, 'All eight mandated disclosures are machine-checked in paper/audit.py and pass \u2014 full text in Section V of the paper.',
+  chip(s, 0.6, 6.15, 12.13, 0.66, 'All ten mandated disclosures are machine-checked in paper/audit.py and pass \u2014 full text in Section V of the paper.',
     { fill: WHITE, gfill: MINT, fs: 13 });
   slideNum(s, 8);
   s.addNotes('Read these aloud if time is short. Judges reward calibrated claims: each limitation here is also stated in the abstract or results of the paper.');
@@ -271,8 +276,8 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
   s.addShape(ST.ellipse, { x: -1.8, y: 5.4, w: 5.2, h: 5.2, fill: { color: SEAFOAM, transparency: 88 }, line: { type: 'none' } });
   title(s, 'Takeaways', true);
   const items = [
-    ['1', 'Ordinary public data, tuned honestly, beats naive baselines on both tasks \u2014 AUC ' + fx('module1_triage.auc_xgb_cv') + ' for triage and ' + Number(v('module2_outbreak.delta_enrichment')).toFixed(1) + '\u00D7 outbreak enrichment \u2014 with protocol limits stated up front.'],
-    ['2', 'A marginal guarantee is worth having: mean recall ' + fx('module1_triage.conformal_mean_recall') + ' with ' + pc('module1_triage.conformal_frac_below_085', 0) + ' of splits below target \u2014 provided you publish the failures alongside the mean.'],
+    ['1', 'Ordinary public data, tuned without test-fold peeking, beats naive baselines on both tasks \u2014 AUC ' + fx('module1_triage.auc_xgb_cv') + ' for triage (cross-fitted under-triage ' + pc('module1_triage.nested_under_triage') + ') and ' + Number(v('module2_outbreak.delta_enrichment')).toFixed(1) + '\u00D7 outbreak enrichment \u2014 with protocol limits stated up front.'],
+    ['2', 'Guarantees must be priced: the marginal conformal rule leaves ' + pc('module1_triage.conformal_frac_below_085', 1) + ' of splits below target, and the PAC rule cuts that to ' + pc('module1_triage.pac_frac_below_085', 1) + ' at \u03B4 = ' + pc('module1_triage.pac_delta', 0) + ' \u2014 publish the failures alongside the mean.'],
     ['3', 'Reproducibility is a feature, not a footnote: fail-closed inputs, byte-identical seed-42 reruns, and one JSON behind every number in four output formats.'],
   ];
   let y = 1.75;
@@ -281,7 +286,7 @@ const row = (s, y, g, head, body, { gc = MINT, gtxt } = {}) => {
     s.addText(txt, { x: 1.65, y, w: 10.9, h: 1.25, fontFace: BODY, fontSize: 15.5, color: WHITE, margin: 0, valign: 'top' });
     y += 1.42;
   }
-  s.addText('Next: prospective validation on rural-Indian telemedicine casemix, drift monitoring, calibration repair \u2014 SHAP, calibration and forecast artifacts ship with the repository.',
+  s.addText('Next: prospective validation on rural-Indian telemedicine casemix, drift monitoring, threshold re-tuning \u2014 SHAP, calibration and forecast artifacts ship with the repository.',
     { x: 0.9, y: 6.2, w: 11.5, h: 0.5, fontFace: BODY, fontSize: 13, italic: true, color: ICE, margin: 0 });
   slideNum(s, 10, true);
   s.addNotes('Close on the three claims the evidence actually supports, then the honest future-work list. Invite questions on the conformal layer or the transfer caveat.');

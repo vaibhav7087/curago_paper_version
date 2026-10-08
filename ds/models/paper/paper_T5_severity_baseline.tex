@@ -1,12 +1,12 @@
 \begin{table}[t]
 \centering
-\caption{Seed-42 split-conformal test performance (bootstrap 95\% CIs, 1000 resamples) versus the NEWS2 vitals-only baseline. No NEWS2 cutoff $\geq$1 reaches 0.85 recall on calibration, so a matched comparison is infeasible (documented).}
+\caption{Seed-42 split-conformal test performance (bootstrap 95\% CIs, 1000 resamples) versus the NEWS2 vitals-only baseline. No NEWS2 cutoff $\geq$1 reaches 0.85 recall on calibration, so a matched comparison is infeasible (documented). Brier of the calibrated primary model: 0.112 vs 0.129 for a constant predictor at the train-split prevalence.}
 \label{tab:severity_baseline}
 \begin{tabular}{lrrrrrrrrlc}
 \toprule
 Method & Recall & Recall 95\% CI & Precision & Precision 95\% CI & AUC & AUC 95\% CI & Brier & Abstention & Matches 0.85 target? & Data Source \\
 \midrule
-XGBoost + conformal (seed-42 test) & 0.913 & [0.886, 0.940] & 0.187 & [0.169, 0.203] & 0.739 & [0.713, 0.766] & 0.158 & 0.231 & Yes & CDC NHAMCS 2019 ED (n=13,595) \\
+Primary + conformal (seed-42 test) & 0.886 & [0.856, 0.914] & 0.199 & [0.179, 0.216] & 0.755 & [0.728, 0.781] & 0.112 & 0.036 & Yes & CDC NHAMCS 2019 ED (n=13,595) \\
 NEWS2 vitals-only, cutoff >=5 & 0.138 &  & 0.207 &  &  &  &  &  & No & CDC NHAMCS 2019 ED (n=13,595) \\
 NEWS2 vitals-only, cutoff >=1 (max recall) & 0.669 &  & 0.168 &  &  &  &  &  & No & CDC NHAMCS 2019 ED (n=13,595) \\
 \bottomrule

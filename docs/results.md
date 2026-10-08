@@ -1,4 +1,4 @@
-# Verified results (regenerated 2026-10-07, deterministic — see QA note)
+# Verified results (regenerated 2026-10-08, deterministic — see QA note)
 
 All numbers below are read straight from the committed artifacts in `ds/models/`.
 Rerunning any trainer on the raw data from `ds/data/README.md` reproduces them
@@ -8,27 +8,40 @@ render jitter across runs, data identical — original rendering kept).
 ## F1 — triage severity (CDC NHAMCS 2019 ED, n=13,595)
 
 Baseline at default 0.5 threshold (`metric_table.csv`, 5-fold CV — no held-out
-test set; CV means reported):
+test set; CV means reported). Primary model is fixed by a pre-declared rule:
+lowest OOF Brier among the calibrated candidates (ties → isotonic):
 
-| Model | AUC-ROC | Recall | Precision | F1 | Under-triage |
-|---|---|---|---|---|---|
-| Logistic Regression (baseline) | 0.719 | 0.609 | 0.269 | 0.373 | 0.391 |
-| XGBoost (class-weighted) | 0.732 | 0.513 | 0.334 | 0.405 | 0.487 |
+| Model | AUC-ROC | Recall | Precision | F1 | Under-triage | Brier |
+|---|---|---|---|---|---|---|
+| Logistic Regression (baseline) | 0.719 | 0.609 | 0.269 | 0.373 | 0.391 | 0.209 |
+| XGBoost (class-weighted) | 0.732 | 0.513 | 0.334 | 0.405 | 0.487 | 0.165 |
+| XGBoost (unweighted) | 0.743 | 0.188 | 0.571 | 0.283 | 0.812 | 0.113 |
+| **XGBoost (unweighted + isotonic) — primary** | 0.742 | 0.141 | 0.606 | 0.227 | 0.859 | **0.113** |
+| XGBoost (unweighted + Platt) | 0.743 | 0.158 | 0.593 | 0.249 | 0.842 | 0.113 |
+| Constant (train prevalence) | 0.500 | 0.000 | 0.000 | 0.000 | 1.000 | 0.129 |
+
+AUC 95% CI (paired bootstrap, 1000 resamples): primary [0.728, 0.751],
+LogReg [0.708, 0.731], difference [0.012, 0.031] (excludes zero).
+Calibrated Brier (0.113) beats the constant reference (0.129); class weighting
+distorts probabilities (0.165).
 
 Tuned operating point (`operating_point.json` + `threshold_tradeoff.csv`,
-rule: lowest threshold with out-of-fold recall ≥ 0.80, tie-break max precision;
-AUC unchanged — tuning moves along the ROC curve):
+rule: maximum precision among thresholds with OOF recall ≥ 0.80, ties →
+higher threshold; AUC unchanged — tuning moves along the ROC curve):
 
-| Model | Threshold | Recall | Precision | Under-triage | Over-triage | Abstention |
+| Model | Threshold | Recall | Precision | FPR | Under-triage | Abstention |
 |---|---|---|---|---|---|---|
-| Logistic Regression | 0.40 | 0.811 | 0.214 | 0.189 | 0.786 | 0.394 |
-| XGBoost (wired into `predict.py`) | 0.25 | 0.845 | 0.207 | 0.155 | 0.793 | 0.235 |
+| Logistic Regression | 0.40 | 0.811 | 0.214 | — | 0.189 | 0.394 |
+| XGBoost primary (pooled) | 0.11 | 0.800 | 0.226 | 0.493 | 0.200 | 0.042 |
+| XGBoost primary (**nested cross-fitted**) | 0.09–0.10 | **0.829** | 0.214 | 0.545 | **0.172** | 0.042 |
 
-Reading: tuning cuts XGB under-triage 0.487 → 0.155 at the cost of over-triage
-0.666 → 0.793 (precision 0.334 → 0.207). The abstain rule
-(`max(proba) < 0.60`) is unchanged; 23.5% of XGB cases abstain at the tuned
-point. Both operating points are reported — this is the standard
-sensitivity-first tradeoff of triage, not metric inflation.
+The nested row is the conservative headline: each outer fold re-selects its
+threshold on the other four folds only, then evaluates on its own test fold —
+no test-fold peeking. Reading: tuning cuts under-triage 0.859 → 0.172 at the
+cost of FPR (0.016 → 0.545) and precision (0.606 → 0.214). The abstain rule
+(`max(proba) < 0.60`, i.e. calibrated probability in (0.4, 0.6)) is unchanged;
+4.2% of cases abstain at the tuned point (39.4% for LogReg). This is the
+standard sensitivity-first tradeoff of triage, not metric inflation.
 
 Top RFV drivers decoded in `docs/rfv_codebook.md` (official NCHS labels).
 
@@ -73,30 +86,37 @@ Finding stands: naive baselines are competitive on 2/8 drugs — stated, not hid
 
 ## Conformal triage (added 2026-10-08, `conformal_triage.py`)
 
-Split-conformal recall control, alpha=0.15: 60/20/20 stratified splits, XGB
-(existing config + hist/n_jobs, train-only scale_pos_weight), calibration
-quantile k=floor(0.15·(n+1)) on calibration positives. 200 seeds (0–199):
+Split-conformal recall control, alpha=0.15: 60/20/20 stratified splits,
+primary model (unweighted XGB + isotonic calibration), calibration quantile on
+positives. 200 seeds (0–199), two rules:
 
-- Mean test recall **0.8504** vs target 0.85; **46% of individual splits fall
-  below 0.85** — the guarantee is marginal (average over calibration draws),
-  never per-split. Histogram: `conformal_recall_hist.png`.
-- Mean threshold 0.21, mean abstention 0.22. Alpha sweep means (recall/precision):
-  0.05→0.953/0.171, 0.10→0.902/0.185, 0.15→0.850/0.198, 0.20→0.800/0.212,
-  0.30→0.700/0.241 (`conformal_alpha_sweep.csv`).
-- Seed-42 reference split (`severity_extras.json`): t=0.1731, recall 0.913
-  (95% CI 0.886–0.940), precision 0.187 (0.169–0.203), AUC 0.739
-  (0.713–0.766), Brier 0.1575, abstention 0.231.
+- **Marginal (textbook rank k=⌊α(n+1)⌋):** mean test recall **0.884**
+  (SD 0.033) vs target 0.85; **12.5% of individual splits fall below 0.85** —
+  the guarantee is average over calibration draws, never per-split. Mean
+  threshold 0.094, mean precision 0.196, mean abstention 0.043.
+- **PAC (Beta order statistic, delta=0.10):** mean recall **0.900**
+  (SD 0.030); below-target share **3.5%** (within the delta budget); mean
+  threshold 0.089, mean precision 0.191. A lower rank → lower threshold →
+  higher recall, at a small precision cost.
+- Alpha sweep means (marginal | PAC): 0.05→0.966/0.169 | 0.976/0.164;
+  0.10→0.924/0.183 | 0.938/0.179; 0.15→0.884/0.196 | 0.900/0.191;
+  0.20→0.832/0.212 | 0.858/0.204; 0.30→0.737/0.243 | 0.768/0.233
+  (`conformal_alpha_sweep.csv`).
+- Seed-42 reference split (`severity_extras.json`): t=0.0985, recall 0.886
+  (95% CI 0.856–0.914), precision 0.199 (0.179–0.215), FPR 0.643, AUC 0.755
+  (0.728–0.781), Brier 0.112 (constant 0.129), abstention 0.036.
 - NEWS2 vitals-only baseline: **no cutoff ≥1 reaches 0.85 recall on
   calibration** (matched comparison infeasible — documented). Clinical cutoff
   ≥5: recall 0.138/precision 0.207; max-recall cutoff 1: 0.669/0.168.
-  Conformal XGB (0.913/0.187) wins on recall at comparable precision.
-- Reliability diagram (`calibration_curve.png`): model is overconfident —
-  probabilities are rank-useful for the threshold rule, not quoted as risks.
+  The learned model (0.886/0.199) wins on recall at comparable precision.
+- Reliability diagram (`calibration_curve.png`): isotonic calibration beats
+  the constant baseline (Brier 0.112 vs 0.129) — probabilities drive the
+  threshold rule and are not quoted as absolute risks.
 
-Limitations: the conformal guarantee assumes exchangeability between
-calibration and test (holds within this US ED sample by construction); it does
-NOT transfer automatically to rural-India deployment data. F1 evaluation is
-5-fold CV plus this single-protocol split study — no second held-out set.
+Limitations: both conformal rules assume exchangeability between calibration
+and test (holds within this US ED sample by construction); neither transfers
+automatically to deployment data. F1 evaluation is 5-fold CV plus nested
+cross-fitted threshold tuning plus this split study — no external test set.
 
 ## Outbreak methods comparison (added 2026-10-08, `outbreak_eval_v2.py`)
 

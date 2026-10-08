@@ -9,8 +9,10 @@ Uses the fixed seed-42 60/20/20 split via conformal_triage helpers (no drift).
 2. NEWS2-style rule baseline on available vitals (tempF, pulse, resp, BP sys,
    SpO2): standard NEWS2 cutoffs, missing vitals score 0 (rate disclosed).
    Cutoff = lowest NEWS total with calibration recall >= 0.85 (same bar as
-   conformal); report NEWS test recall/precision beside XGBoost.
-3. Calibration plot (10 uniform bins reliability diagram) + Brier score.
+   conformal); report NEWS test recall/precision beside the primary model.
+3. Calibration plot (10 uniform bins reliability diagram) + Brier score for
+   the primary (isotonic-calibrated) model and for a constant predictor at
+   the train-split prevalence (the reference the Brier must beat).
 
 Usage: python ds/severity_eval_extras.py
 Outputs: models/severity_extras.json, models/calibration_curve.png
@@ -22,7 +24,8 @@ from pathlib import Path
 from sklearn.metrics import recall_score, precision_score, roc_auc_score, brier_score_loss
 
 from train_triage import load_real, DATA_SOURCE_LABEL
-from conformal_triage import split_60_20_20, build_pipe, conformal_threshold, MAIN_ALPHA
+from conformal_triage import split_60_20_20, conformal_threshold, MAIN_ALPHA
+from triage_models import make_estimator, PRIMARY
 
 HERE = Path(__file__).parent
 MODEL_DIR = HERE / "models"
@@ -83,26 +86,32 @@ def main():
     X = data.drop(columns=["is_high_severity"])
     y = data["is_high_severity"].to_numpy()
     (X_tr, y_tr), (X_cal, y_cal), (X_te, y_te) = split_60_20_20(X, y, SEED)
-    neg, pos = np.bincount(y_tr)
-    pipe = build_pipe(float(neg / max(1, pos)))
+    pipe = make_estimator(PRIMARY)
     pipe.fit(X_tr, y_tr)
     cal_proba = pipe.predict_proba(X_cal)[:, 1]
     test_proba = pipe.predict_proba(X_te)[:, 1]
     t, n_cal_pos = conformal_threshold(cal_proba[y_cal == 1], MAIN_ALPHA)
     pred = (test_proba >= t).astype(int)
+    prev_train = float(y_tr.mean())
+    neg_te = y_te == 0
 
     test_metrics = {
         "recall": round(float(recall_score(y_te, pred)), 4),
         "precision": round(float(precision_score(y_te, pred)), 4),
+        "fpr": round(float(((pred == 1) & neg_te).sum() / max(1, neg_te.sum())), 4),
         "auc": round(float(roc_auc_score(y_te, test_proba)), 4),
         "brier": round(float(brier_score_loss(y_te, test_proba)), 4),
+        "brier_constant_trainprev": round(float(brier_score_loss(
+            y_te, np.full(len(y_te), prev_train))), 4),
+        "train_prevalence": round(prev_train, 4),
         "abstention_rate": round(float((np.maximum(test_proba, 1 - test_proba) < 0.60).mean()), 4),
     }
     cis = bootstrap_ci(y_te, test_proba, t, rng)
     print(f"seed-42: t={t:.4f} recall={test_metrics['recall']} "
           f"(95% CI {cis['recall']}) precision={test_metrics['precision']} "
-          f"(95% CI {cis['precision']}) auc={test_metrics['auc']} "
-          f"(95% CI {cis['auc']}) brier={test_metrics['brier']}")
+          f"(95% CI {cis['precision']}) fpr={test_metrics['fpr']} "
+          f"auc={test_metrics['auc']} (95% CI {cis['auc']}) "
+          f"brier={test_metrics['brier']} const={test_metrics['brier_constant_trainprev']}")
 
     # NEWS2 baseline
     cal_news, _ = news2_scores(X_cal)
@@ -161,7 +170,8 @@ def main():
         plt.annotate(str(n), (x, yy), fontsize=7)
     plt.xlabel("mean predicted P(High)")
     plt.ylabel("observed fraction High")
-    plt.title(f"XGBoost reliability, seed-42 test (Brier={test_metrics['brier']:.4f}, "
+    plt.title(f"Primary model reliability, seed-42 test (Brier={test_metrics['brier']:.4f} "
+              f"vs constant {test_metrics['brier_constant_trainprev']:.4f}; "
               "dot labels = n)")
     plt.legend()
     plt.tight_layout()

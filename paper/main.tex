@@ -20,7 +20,7 @@
 
 \begin{document}
 
-\title{Real-Data Machine Learning for Rural Telemedicine Triage and Outbreak Surveillance}
+\title{Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance}
 
 \author{
 \IEEEauthorblockN{Author One, Author Two}
@@ -38,25 +38,24 @@ City, India\\
 \thispagestyle{plain}
 
 \begin{abstract}
-Rural telemedicine platforms face two simultaneous decisions: which individual
+Telemedicine platforms face two simultaneous decisions: which individual
 patients can be managed remotely and which require urgent escalation, and
 whether population-level signals indicate a developing outbreak. We evaluate a
 data-science layer built exclusively on public, real-world data: the CDC NHAMCS
 2019 emergency department survey (\Nanalysis{} analysis encounters), the
 covid19india district-level archive (\DWeeks{} district-weeks across
 \NDistricts{} districts), and a Kaggle pharmaceutical sales series
-(\Months{} months). For triage, a class-weighted XGBoost model reaches
-cross-validated AUC \AUCxgb{} versus \AUClogreg{} for a logistic baseline.
-Operating-point selection reduces under-triage from \UnderTPct\% at the default
-threshold to \TunedUnderPct\% at $t=\TunedT$ (recall \TunedRecall), and a
-split-conformal calibration attains mean recall \CMeanR{} over \CNseeds{}
-randomized splits, with \CBelowPct\% of individual splits under the 0.85
-target -- a marginal rather than per-split guarantee. For surveillance, an
-IsolationForest operating at a fixed 5\% alert budget enriches the Delta wave
-\DeltaEnr$\times${} over its background flag rate with a median lead of
-\LeadWk{} weeks; this is reported descriptively because no labeled outbreak
-ground truth exists. No synthetic data is used, and all code and seeds are
-released for exact reproduction.
+(\Months{} months). For triage, a calibrated XGBoost reaches cross-validated
+AUC \AUCxgb{} versus \AUClogreg{} for a logistic baseline. Cross-fitted
+threshold selection cuts under-triage from \UnderTPct\% to \NestedUnderPct\%
+at FPR \FPRNested, and a PAC split-conformal rule raises mean recall over
+\CNseeds{} splits to \PacMeanR{}, keeping below-target splits to
+\PacBelowPct\% ($\leq\delta$) versus \CBelowPct\% for the marginal rule;
+precision is \PacMeanP{} at \Prev{} prevalence. For surveillance, an
+IsolationForest at a fixed 5\% alert budget enriches the Delta wave
+\DeltaEnr$\times${} over background with a median lead of \LeadWk{} weeks,
+reported descriptively since no labeled outbreak ground truth exists. No
+synthetic data is used; all code and seeds are released for reproduction.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -103,25 +102,26 @@ covid19india district time-series archive~\cite{covid19india2023} covering
 pharmaceutical demand from a public Kaggle point-of-sale series
 (Zdravkovi\'c~\cite{zdravkovic2019pharma}). Together they mirror the
 architecture of the deployed platform (Fig.~\ref{fig:pipeline}) while keeping
-every evaluation number traceable to a committed artifact.
+every evaluation number traceable to a committed artifact; a deterministic
+fail-closed pipeline regenerates everything from raw files (no synthetic
+data; seed-42 reruns byte-identical).
 
-The paper makes four contributions:
+The paper makes three contributions:
 \begin{enumerate}
-\item A safety-first operating-point analysis for triage in which threshold
-selection (rather than model surgery) cuts the under-triage rate from
-\UnderTPct\% to \TunedUnderPct\% at recall \TunedRecall, with an abstention
-band that routes low-confidence predictions to a physician.
-\item An honest calibration study of split-conformal recall control: across
-\CNseeds{} randomized splits the method attains mean recall \CMeanR{}
-(SD \CSdR), yet \CBelowPct\% of individual splits miss the 0.85 target, and we
-quantify exactly which guarantee holds.
+\item A safety-first operating-point analysis for triage in which
+cross-fitted threshold selection (rather than model surgery) cuts
+under-triage from \UnderTPct\% down to \NestedUnderPct\% while holding FPR
+at \FPRNested, with an abstention band that routes low-confidence
+predictions to a physician.
+\item A calibration-and-guarantee study: isotonic calibration of an ordinary
+booster beats a constant predictor on out-of-fold Brier (\CalBrier{} vs
+\BrierConst), and a PAC split-conformal rule keeps below-target splits to
+\PacBelowPct\% across \CNseeds{} randomized splits (\CBelowPct\% for the
+marginal rule), quantifying exactly which guarantee holds.
 \item A label-free outbreak evaluation design that scores detectors by
 empirical wave enrichment under a fixed alert budget rather than by invented
 precision/recall labels, showing \DeltaEnr$\times${} Delta-wave
 concentration for single-week isolation flags.
-\item A fully deterministic, fail-closed reproducibility pipeline: no
-synthetic data, no silently skipped steps, seed-42 reruns byte-identical, and
-every figure, table, and number regenerated from raw files by script.
 \end{enumerate}
 
 Sections~\ref{sec:related}--\ref{sec:discussion} cover related work, data
@@ -175,8 +175,9 @@ Survey 2019 emergency department file~\cite{nhamcs2019} is a US
 public-domain, de-identified survey. Restricting to records with a valid
 recorded triage level yields \Nanalysis{} analysis encounters from \Nraw{}
 raw records, with high-acuity prevalence \Prev. The target label marks
-encounters recorded as emergent or urgent (the escalation-worthy class under
-the platform's routing policy). Features are age, sex, six vital signs
+encounters recorded as emergent or urgent (nurse-assigned registration
+acuity, the escalation-worthy class under the platform's routing
+policy). Features are age, sex, six vital signs
 (temperature, pulse, respiratory rate, systolic and diastolic pressure, oxygen
 saturation), pain scale, and dummy indicators for the 20 most frequent
 reason-for-visit codes decoded with official NCHS labels; missing vitals are
@@ -198,20 +199,33 @@ by rule, and the final 12 months form the holdout.
 \subsection{Triage model and operating rule}
 \label{sec:triage-method}
 
-Two models are trained under a shared 5-fold stratified protocol
+Six candidate pipelines are trained under a shared 5-fold stratified protocol
 (seed 42): a class-weighted logistic regression with standardization (the
-baseline) and a class-weighted XGBoost~\cite{chen2016xgboost}
+baseline), class-weighted and unweighted XGBoost~\cite{chen2016xgboost}
 (\texttt{n\_estimators}=200, depth 6, learning rate 0.1,
-\texttt{scale\_pos\_weight} computed from training folds), both behind a
-median imputer using scikit-learn~\cite{pedregosa2011scikit}. Under-triage is
-defined as $1-\text{recall}$ on the high-acuity class.
+\texttt{scale\_pos\_weight} computed from training folds), and the unweighted
+booster wrapped in isotonic or Platt calibration, all behind a median imputer
+using scikit-learn~\cite{pedregosa2011scikit}. The primary model is fixed by
+a pre-declared rule: lowest 5-fold out-of-fold Brier among the calibrated
+candidates, ties broken toward isotonic --- which selects unweighted XGBoost
+$+$ isotonic (Brier \CalIsoBrier{} versus \CalPlattBrier{} for Platt).
+Calibration and unweighting both matter: the class-weighted predecessor
+distorts probabilities (Brier \BrierWeighted{}) and reaches only
+\AUCWeighted{} AUC versus \AUCxgb{}. Under-triage is defined as
+$1-\text{recall}$ on the high-acuity class.
 
 Rather than accept the default 0.5 threshold, we select the operating point
-from the out-of-fold probability sweep as the lowest threshold whose recall
-reaches at least 0.80, tie-broken by precision; this yields $t=\TunedT$ for
-XGBoost. A physician-abstention band routes any case with maximum class
-probability below 0.60 to human review regardless of threshold. Threshold
-tuning moves the model along its ROC curve; it does not change AUC.
+from the out-of-fold probability sweep as the threshold with maximum precision
+among those whose recall reaches at least 0.80, ties broken toward the higher
+threshold; this yields $t=\TunedT$ for the pooled sweep. Because selecting on
+the same folds flatters the result, we also report a nested cross-fitted
+estimate: each outer fold re-selects its threshold on the other four folds
+only, giving thresholds \NestedTmin--\NestedTmax. A physician-abstention band
+routes any case whose maximum class probability falls below 0.60 (i.e.,
+calibrated high-acuity probability in $(0.4, 0.6)$) to human review
+regardless of threshold; the band bounds indecision near the decision
+boundary, not confident errors far below it. Threshold tuning moves the model
+along its ROC curve; it does not change AUC.
 
 \input{../ds/models/paper/paper_T1_triage_models}
 
@@ -222,13 +236,20 @@ To target a sensitivity level with a finite-sample statement, we wrap the
 trained classifier in split-conformal calibration~\cite{vovk2005algorithmic,
 angelopoulos2021gentle}: each replicate draws stratified 60/20/20
 train/calibration/test splits; on the calibration set the decision threshold
-is set to the $\lfloor\alpha(n+1)\rfloor$-th smallest predicted probability
-among positives at error level $\alpha=\AlphaC$, i.e. a nominal recall of
-$1-\alpha=0.85$. We repeat over \CNseeds{} random seeds (0--199) and report
-the distribution of test recall, the implied thresholds, and abstention
-rates. The protocol uses train-fold statistics only. As a clinical reference
-we also evaluate NEWS2~\cite{rcp2017news2,smith2019news2} computed from the
-vitals columns alone.
+is set from the predicted probabilities of the positive class at error level
+$\alpha=\AlphaC$, i.e. a nominal recall of $1-\alpha=0.85$. The textbook
+choice takes the $\lfloor\alpha(n+1)\rfloor$-th order statistic, whose
+guarantee is \emph{marginal}: it constrains the average over calibration
+draws, not the share of individual splits that miss the target. We therefore
+also report a PAC (probably approximately correct) variant that picks the
+largest rank $k$ for which the Beta$(n{+}1{-}k,\,k)$ CDF at $1-\alpha$ is at
+most $\delta=\PacDelta$: a lower rank lowers the threshold and raises recall,
+buying a bound in which at most \PacDeltaPct\% of splits fall below
+target. We repeat over \CNseeds{} random seeds (0--199) under both rules and
+report the distribution of test recall, the implied thresholds, and
+abstention rates. The protocol uses train-fold statistics only. As a clinical
+reference we also evaluate NEWS2~\cite{rcp2017news2,smith2019news2} computed
+from the vitals columns alone.
 
 \subsection{Outbreak surveillance under an alert budget}
 \label{sec:outbreak-method}
@@ -238,7 +259,7 @@ IsolationForest with contamination 0.05, which fixes the alert budget at 5\%
 of district-weeks by construction; we never present that fraction as a
 detected-outbreak rate. Two variants (single-week flags and
 confirmation-filtered flags) are compared against a rolling 4-week z-score
-baseline~\cite{pedregosa2011scikit}. Because no gold labels exist, evaluation
+baseline. Because no gold labels exist, evaluation
 is \emph{descriptive enrichment}: for the Delta (2021-04-01--2021-06-30) and
 Omicron wave windows we report the flag rate inside the window versus the
 background flag rate outside it, district coverage, and median lead relative
@@ -258,10 +279,17 @@ numbers are regenerated from \texttt{paper\_numbers.json}.
 
 \subsection{Triage discrimination and interpretability}
 
-Table~\ref{tab:triage_models} compares the two learners at the default
-threshold. XGBoost leads on AUC (\AUCxgb{} vs \AUClogreg{}) and precision,
-but at $t=0.5$ it misses \UnderT{} of high-acuity patients, an unacceptable
-operating point for triage. Fig.~\ref{fig:roc} shows the ROC curves with the
+Table~\ref{tab:triage_models} compares the candidates at the default
+threshold, with out-of-fold Brier as the calibration view: the primary
+calibrated model reaches \CalBrier{} against \BrierConst{} for a constant
+predictor (the reference it must beat), while the class-weighted variant sits
+at \BrierWeighted. On discrimination the primary reaches AUC \AUCxgb{}
+(95\% CI \AUCxgbCIlo--\AUCxgbCIhi) versus \AUClogreg{}
+(\AUClogregCIlo--\AUClogregCIhi) for logistic regression, and the paired
+bootstrap difference interval \AUCdiffLo--\AUCdiffHi excludes zero. At
+$t=0.5$, however, it misses \UnderT{} of high-acuity patients --- an
+unacceptable operating point for triage despite a low false-positive rate of
+only \FPRDefault. Fig.~\ref{fig:roc} shows the ROC curves with the
 default, tuned, and conformal operating points marked: the entire useful
 operating region lies well below $t=0.5$. SHAP attributions
 (supplementary figure, repository artifact \texttt{paper\_fig2\_shap})
@@ -273,7 +301,7 @@ chest pain and shortness of breath.
 \centering
 \includegraphics[width=3.15in]{paper_fig1_roc}
 \caption{Triage ROC under 5-fold cross-validation (\Nanalysis{} analysis
-encounters): curves for both learners, chance diagonal, and marked
+encounters): curves for the candidate models, chance diagonal, and marked
 default, tuned, and seed-42 conformal operating points. The legend
 reports each curve's AUC. Data: CDC NHAMCS 2019 ED.}
 \label{fig:roc}
@@ -282,20 +310,27 @@ reports each curve's AUC. Data: CDC NHAMCS 2019 ED.}
 \subsection{Operating-point selection}
 
 Table~\ref{tab:operating_points} and Fig.~\ref{fig:tradeoff} show the central
-triage result: lowering the threshold from 0.50 to $\TunedT$ cuts
-under-triage from \UnderTPct\% to \TunedUnderPct\% (recall \TunedRecall) at
-the cost of precision (\TunedPrec{}) and abstention \TunedAbst; over-triage
-rises correspondingly. This is the standard sensitivity-first trade of
-emergency triage, reported on both axes so the exchange is visible. The
-abstention band keeps \TunedAbst{} of cases with the model deferring to a
-physician, which bounds the blast radius of the precision drop.
+triage result. On the pooled sweep, lowering the threshold from 0.50 to
+$\TunedT$ cuts under-triage from \UnderTPct\% to \TunedUnderPct\% (recall
+\TunedRecall, FPR \FPRTuned) at the cost of precision (\TunedPrec{}) and
+abstention \TunedAbst. The nested cross-fitted estimate --- the conservative
+one to quote, since each outer fold tunes without seeing its own test labels
+---
+puts recall at \NestedRecall, precision \NestedPrec, FPR \FPRNested and
+under-triage \NestedUnderPct\% across thresholds \NestedTmin--\NestedTmax,
+confirming the trade survives out-of-fold tuning. This is the standard
+sensitivity-first trade of emergency triage, reported on both axes so the
+exchange is visible. The abstention band defers \NestedAbst{} of cases to a
+physician, bounding model indecision near the boundary --- it does not bound
+the false-high risk of confidently low predictions below the band.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=3.15in]{paper_fig3_tradeoff}
-\caption{Out-of-fold threshold trade-offs (recall, precision, under- and
+\caption{Out-of-fold threshold trade-offs (recall, precision, FPR, under- and
 over-triage, abstention) with the pre-declared selections
-$t=\TunedT$ (XGBoost). Data: CDC NHAMCS 2019 ED.}
+$t=\TunedT$ (pooled sweep) and the nested range \NestedTmin--\NestedTmax.
+Data: CDC NHAMCS 2019 ED.}
 \label{fig:tradeoff}
 \end{figure}
 
@@ -304,19 +339,25 @@ $t=\TunedT$ (XGBoost). Data: CDC NHAMCS 2019 ED.}
 \subsection{Conformal recall control}
 
 Table~\ref{tab:conformal} sweeps the conformal error level over
-\CNseeds{} splits per setting. At $\alpha=\AlphaC$ the mean test recall is
-\CMeanR{} (SD \CSdR), yet \CBelowPct\% of the splits miss the 0.85 mark
-(Fig.~\ref{fig:conformal}); the finite-sample statement is
-marginal over calibration draws, not a per-deployment promise, and we state
-it that way. Mean implied thresholds (\CMeanT{}) and abstention
-(\CMeanA{}) are stable across seeds.
+\CNseeds{} splits per setting under both rules. At $\alpha=\AlphaC$ the
+marginal rule reaches mean test recall \CMeanR{} (SD \CSdR) at mean
+precision \CMeanPrec, yet \CBelowPct\% of the splits miss the 0.85 mark
+(Fig.~\ref{fig:conformal}); the finite-sample statement is marginal over
+calibration draws, not a per-deployment promise, and we state it that way.
+The PAC rule at $\delta=\PacDelta$ changes the accounting: mean recall rises
+to \PacMeanR{} (SD \PacSdR) and only \PacBelowPct\% of splits fall below
+target --- within the $\delta$ budget --- at mean precision \PacMeanP{} and
+mean threshold \PacMeanT{} (versus \CMeanT{} for the marginal rule). The
+cost is a lower threshold and hence more flags; mean abstention (\CMeanA{})
+is stable across seeds.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=3.15in]{paper_fig4_conformal_hist}
 \caption{Split-conformal test recall per split over \CNseeds{} random
-splits; the dashed line marks the nominal sensitivity target and the
-solid line the split mean. The guarantee is marginal, not per-split.
+splits under the marginal and PAC rules; the dashed line marks the nominal
+sensitivity target and solid lines the rule means. The marginal rule is not
+a per-split guarantee; PAC bounds the below-target share at $\delta$.
 Data: CDC NHAMCS 2019 ED.}
 \label{fig:conformal}
 \end{figure}
@@ -324,15 +365,16 @@ Data: CDC NHAMCS 2019 ED.}
 \input{../ds/models/paper/paper_T4_conformal}
 
 On the seed-42 reference split the conformal selector reaches recall \SdR{}
-(95\% bootstrap CI \SdCIlo--\SdCIhi), precision \SdP, AUC \SdAUC, Brier
-\SdBrier, abstention \SdAbst, at threshold \SdT. The vitals-only NEWS2
-baseline cannot match the target on this cohort: no cutoff reaches the 0.85
-recall level (cutoff $\geq 1$ attains recall \NewsAtOneR{} at precision
-\NewsAtOneP; the clinical cutoff $\geq 5$ attains \NewsAtFiveR{} at \NewsAtFiveP).
-The learned model therefore buys recall at comparable precision, but its
-reliability diagram (supplementary artifact
-\texttt{paper\_figS1b\_calibration}, Brier \SdBrier) shows overconfident
-probabilities: scores are rank-useful for the threshold rule and are not
+(95\% bootstrap CI \SdCIlo--\SdCIhi), precision \SdP, FPR \FPRConf, AUC
+\SdAUC, Brier \SdBrier, abstention \SdAbst, at threshold \SdT. The
+vitals-only NEWS2 baseline cannot match the target on this cohort: no cutoff
+reaches the 0.85 recall level (cutoff $\geq 1$ attains recall \NewsAtOneR{}
+at precision \NewsAtOneP; the clinical cutoff $\geq 5$ attains
+\NewsAtFiveR{} at \NewsAtFiveP). The learned model therefore buys recall at
+comparable precision; its reliability diagram (supplementary artifact
+\texttt{paper\_figS1b\_calibration}; Brier \SdBrier{} versus \BrierConst{}
+for a constant predictor) shows isotonic calibration improving on the
+constant baseline --- probabilities drive the threshold rule and are not
 quoted as absolute risks.
 
 \subsection{Outbreak surveillance}
@@ -346,7 +388,7 @@ confirmation week halves the background to \BgIsoC{} but costs a week of
 lead; the z-score baseline leads earliest and covers the widest share of
 districts, at roughly four times the background flag rate of single-week
 isolation flags (\BgZ). None of these numbers is a precision or recall:
-without district-level outbreak labels, honest claims stop at enrichment.
+without district-level outbreak labels, claims stop at enrichment.
 
 \begin{figure}[!t]
 \centering
@@ -365,7 +407,7 @@ static archive, \NDistricts{} districts.}
 On the 12-month holdout over \Months{} months, per-group MAE winners are
 Holt-Winters on \HWWins{} of 8 drug groups, seasonal naive on \NaiveWins{},
 and LightGBM on \LGBMWins{} (supplementary forecast table, repository
-artifact \texttt{paper\_TS1\_forecast}). The honest reading is
+artifact \texttt{paper\_TS1\_forecast}). The reading is
 that classical baselines remain competitive on short monthly series; this
 module supports logistics, not clinical claims, and is excluded from the main
 findings (supplementary figures in the repository).
@@ -374,12 +416,13 @@ findings (supplementary figures in the repository).
 \label{sec:discussion}
 
 \paragraph{What holds}
-On this cohort, a standard boosted model with a deliberately chosen threshold
-and a physician-abstention band delivers a large, auditable reduction in
-under-triage, and split-conformal calibration provides a workable mechanism
-for targeting sensitivity with a stated error level. The surveillance module shows that a label-free detector concentrates alerts
-in known wave windows far above background, the strongest claim the labels
-support.
+On this cohort, a standard boosted model with a cross-fitted, deliberately
+chosen threshold and a physician-abstention band delivers a large, auditable
+reduction in under-triage, and split-conformal calibration --- especially the
+PAC rule --- provides a workable mechanism for targeting sensitivity with a
+stated error level. The surveillance module shows that a label-free detector
+concentrates alerts in known wave windows far above background, the
+strongest claim the labels support.
 
 \paragraph{Limitations}
 \emph{Transfer.} NHAMCS is US ED data; rural-Indian intake populations,
@@ -387,11 +430,17 @@ disease mix, and vital-sign distributions differ. Conformal coverage holds
 under exchangeability within this sample and does not automatically transfer
 under geographic covariate shift; in deployment the model is a
 decision-support prior behind abstention and physician verification.
-\emph{Guarantee strength.} The conformal guarantee is marginal: \CBelowPct\%
-of individual splits miss the target, so a single unlucky calibration split
-can under-deliver.
-\emph{Calibration.} Tree probabilities are overconfident (Brier \SdBrier);
-they are used for ranking and thresholds, not as quoted risks.
+\emph{Guarantee strength.} The marginal rule's guarantee is average-case:
+\CBelowPct\% of individual splits miss the target, so a single unlucky
+calibration split can under-deliver. The PAC rule cuts this to
+\PacBelowPct\% at $\delta=\PacDelta$ on these splits, but both rules rest on
+exchangeability of calibration draws; under shift either can miss.
+\emph{Calibration.} Isotonic calibration beats a constant predictor
+(\CalBrier{} vs \BrierConst{}) but the probabilities remain unvalidated as
+absolute risks; they drive thresholds, not quotations.
+\emph{Survey design.} NHAMCS sampling weights and clustering strata are not
+modeled; the reported uncertainty reflects split variability, not the
+complex survey design.
 \emph{Labels.} Outbreak evaluation is descriptive enrichment against wave
 windows, not precision/recall; the archive is retrospective, not a live
 surveillance feed.
@@ -421,11 +470,12 @@ Pairing a threshold-tuned, abstention-guarded triage model with a
 label-free outbreak detector turns a telemedicine platform's raw streams into
 two quantified decisions: which patients escalate, and where to look next.
 The results are deliberately bounded---\UnderTPct\% under-triage reduced to
-\TunedUnderPct\% at recall \TunedRecall, a marginal conformal guarantee of
-\CMeanR{} mean recall, and \DeltaEnr$\times${} descriptive wave
-enrichment---and every number is reproducible from public data with released
-code. Future work is prospective validation on rural-Indian intake data and
-calibration monitoring under drift.
+\NestedUnderPct\% at recall \NestedRecall, below-target conformal splits cut
+from \CBelowPct\% to \PacBelowPct\% under the PAC rule with mean recall
+\PacMeanR{}, and \DeltaEnr$\times${} descriptive wave enrichment---and every
+number is reproducible from public data with released code. Future work is
+prospective validation on rural-Indian intake data and calibration
+monitoring under drift.
 
 \bibliographystyle{IEEEtran}
 \bibliography{../docs/references}

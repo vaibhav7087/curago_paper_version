@@ -180,7 +180,8 @@ def validate() -> dict:
     if stats["images"] < 5:
         die(f"expected >=5 images, found {stats['images']}")
     for needle in ("Abstract", "Data Availability", "References",
-                   "Rural telemedicine platforms", "7.0", "0.732",
+                   "Telemedicine platforms face two simultaneous decisions",
+                   "PAC split-conformal rule", "7.0", "0.732",
                    "What holds"):
         if needle not in text:
             die(f"docx missing expected content: {needle!r}")

@@ -4,19 +4,108 @@
     "expected_recall": 0.8111,
     "expected_precision": 0.2138,
     "expected_f1": 0.3384,
+    "expected_fpr": 0.5358,
     "expected_under_triage": 0.1889,
     "expected_over_triage": 0.7862,
     "abstention_rate": 0.3943
   },
   "xgboost": {
-    "threshold": 0.25,
-    "expected_recall": 0.8449,
-    "expected_precision": 0.207,
-    "expected_f1": 0.3325,
-    "expected_under_triage": 0.1551,
-    "expected_over_triage": 0.793,
-    "abstention_rate": 0.2349
+    "threshold": 0.11,
+    "expected_recall": 0.8,
+    "expected_precision": 0.2258,
+    "expected_f1": 0.3522,
+    "expected_fpr": 0.4927,
+    "expected_under_triage": 0.2,
+    "expected_over_triage": 0.7742,
+    "abstention_rate": 0.0422
   },
-  "rule": "lowest threshold with OOF recall>=0.8, tie-break max precision",
+  "nested_xgboost": {
+    "protocol": "outer StratifiedKFold(5, shuffle, seed 42); inner 5-fold OOF selection on the outer-training folds; outer-test evaluation",
+    "thresholds": [
+      0.09,
+      0.1,
+      0.1,
+      0.1,
+      0.09
+    ],
+    "pooled": {
+      "recall": 0.8285,
+      "precision": 0.2143,
+      "f1": 0.3406,
+      "fpr": 0.5454,
+      "under_triage": 0.1715,
+      "over_triage": 0.7857,
+      "abstention_rate": 0.0422,
+      "auc": 0.7402
+    },
+    "per_fold": [
+      {
+        "recall": 0.8285,
+        "precision": 0.2093,
+        "f1": 0.3341,
+        "fpr": 0.5623,
+        "under_triage": 0.1715,
+        "over_triage": 0.7907,
+        "fold": 0,
+        "threshold": 0.09,
+        "n_test": 2719,
+        "inner_tuned_recall": 0.8418,
+        "inner_tuned_precision": 0.207
+      },
+      {
+        "recall": 0.7947,
+        "precision": 0.2134,
+        "f1": 0.3364,
+        "fpr": 0.5262,
+        "under_triage": 0.2053,
+        "over_triage": 0.7866,
+        "fold": 1,
+        "threshold": 0.1,
+        "n_test": 2719,
+        "inner_tuned_recall": 0.8249,
+        "inner_tuned_precision": 0.2137
+      },
+      {
+        "recall": 0.756,
+        "precision": 0.2387,
+        "f1": 0.3629,
+        "fpr": 0.433,
+        "under_triage": 0.244,
+        "over_triage": 0.7613,
+        "fold": 2,
+        "threshold": 0.1,
+        "n_test": 2719,
+        "inner_tuned_recall": 0.8267,
+        "inner_tuned_precision": 0.21
+      },
+      {
+        "recall": 0.8671,
+        "precision": 0.2093,
+        "f1": 0.3372,
+        "fpr": 0.5883,
+        "under_triage": 0.1329,
+        "over_triage": 0.7907,
+        "fold": 3,
+        "threshold": 0.1,
+        "n_test": 2719,
+        "inner_tuned_recall": 0.8364,
+        "inner_tuned_precision": 0.2116
+      },
+      {
+        "recall": 0.8961,
+        "precision": 0.2068,
+        "f1": 0.3361,
+        "fpr": 0.6174,
+        "under_triage": 0.1039,
+        "over_triage": 0.7932,
+        "fold": 4,
+        "threshold": 0.09,
+        "n_test": 2719,
+        "inner_tuned_recall": 0.837,
+        "inner_tuned_precision": 0.2094
+      }
+    ]
+  },
+  "rule": "max precision among thresholds with OOF recall>=0.80 (ties: higher threshold)",
   "selected_model": "xgboost"
 }

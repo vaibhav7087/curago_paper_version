@@ -1,5 +1,6 @@
-Operating point,Threshold,Recall,Precision,Under-triage,Abstention,AUC,Data Source
-"XGBoost, t=0.50 (OOF)",0.5,0.513,0.334,0.487,0.235,0.732,CDC NHAMCS 2019 ED
-"XGBoost, t=0.25 tuned (OOF)",0.25,0.845,0.207,0.155,0.235,0.732,CDC NHAMCS 2019 ED
-"LogReg, t=0.40 tuned (OOF)",0.4,0.811,0.214,0.189,0.394,0.719,CDC NHAMCS 2019 ED
-"XGBoost, conformal, seed-42 test",0.173,0.913,0.187,0.087,0.231,0.739,CDC NHAMCS 2019 ED
+Operating point,Threshold,Recall,Precision,FPR,Under-triage,Abstention,AUC,Data Source
+"Primary, t=0.50 (pooled OOF)",0.5,0.141,0.605,0.016,0.859,0.042,0.74,CDC NHAMCS 2019 ED
+"Primary, tuned (pooled OOF)",0.11,0.8,0.226,0.493,0.2,0.042,0.74,CDC NHAMCS 2019 ED
+"Primary, cross-fitted (headline)","0.096 [0.09, 0.10]",0.829,0.214,0.545,0.172,0.042,0.74,CDC NHAMCS 2019 ED
+"LogReg, tuned (pooled OOF)",0.4,0.811,0.214,0.536,0.189,0.394,0.719,CDC NHAMCS 2019 ED
+"Primary, conformal, seed-42 test",0.099,0.886,0.199,0.643,0.114,0.036,0.755,CDC NHAMCS 2019 ED

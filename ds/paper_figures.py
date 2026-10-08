@@ -85,32 +85,18 @@ def fig0_pipeline():
 
 # ---------------------------------------------------------------- Fig 1: ROC
 def fig1_roc():
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.impute import SimpleImputer
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
     from sklearn.metrics import roc_curve, auc
-    from xgboost import XGBClassifier
     import sys
     sys.path.insert(0, str(HERE))
     from train_triage import load_real
+    from triage_models import make_estimator, PRIMARY, LABELS
 
     data = load_real()
     X = data.drop(columns=["is_high_severity"])
     y = data["is_high_severity"].to_numpy()
-    neg, pos = np.bincount(y)
-    pipes = {
-        "LogReg": Pipeline([("imputer", SimpleImputer(strategy="median")),
-                            ("scaler", StandardScaler()),
-                            ("clf", LogisticRegression(class_weight="balanced",
-                                                       max_iter=1000, random_state=42))]),
-        "XGBoost": Pipeline([("imputer", SimpleImputer(strategy="median")),
-                             ("clf", XGBClassifier(
-                                 scale_pos_weight=float(neg / pos), n_estimators=200,
-                                 max_depth=6, learning_rate=0.1, random_state=42,
-                                 eval_metric="logloss"))]),
-    }
+    pipes = {"LogReg": make_estimator("logreg"),
+             "XGBoost": make_estimator(PRIMARY)}
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     grid = np.linspace(0, 1, 200)
     curves, aucs = {}, {}
@@ -128,10 +114,12 @@ def fig1_roc():
         curves[name] = (np.mean(tprs, axis=0), np.std(tprs, axis=0))
         aucs[name] = float(np.mean(a))
         oof[name] = oof_p
-    # assert against committed CV means
+    # assert against committed CV means (matched by model label, not index)
     mt = pd.read_csv(MODEL_DIR / "metric_table.csv")
-    assert abs(aucs["LogReg"] - mt.loc[0, "AUC-ROC"]) < 0.01, aucs
-    assert abs(aucs["XGBoost"] - mt.loc[1, "AUC-ROC"]) < 0.01, aucs
+    assert abs(aucs["LogReg"] - float(
+        mt.loc[mt.Model == LABELS["logreg"], "AUC-ROC"].iloc[0])) < 0.01, aucs
+    assert abs(aucs["XGBoost"] - float(
+        mt.loc[mt.Model == LABELS[PRIMARY], "AUC-ROC"].iloc[0])) < 0.01, aucs
 
     def point_at(p, t):
         pred = (p >= t).astype(int)
@@ -145,18 +133,13 @@ def fig1_roc():
                point_at(oof["XGBoost"], op["xgboost"]["threshold"]),
            "conformal s42": (None, None)}  # filled below
     # seed-42 conformal point (recompute; assert vs severity_extras.json)
-    from sklearn.model_selection import train_test_split
     from sklearn.metrics import recall_score
-    X_tr, X_tmp, y_tr, y_tmp = train_test_split(
-        X, y, test_size=0.4, stratify=y, random_state=42)
-    X_cal, X_te, y_cal, y_te = train_test_split(
-        X_tmp, y_tmp, test_size=0.5, stratify=y_tmp, random_state=42)
-    xp = pipes["XGBoost"]
+    from conformal_triage import split_60_20_20, conformal_threshold, MAIN_ALPHA
+    (X_tr, y_tr), (X_cal, y_cal), (X_te, y_te) = split_60_20_20(X, y, 42)
+    xp = make_estimator(PRIMARY)
     xp.fit(X_tr, y_tr)
     pc = xp.predict_proba(X_cal)[:, 1]
-    ppos = np.sort(pc[y_cal == 1])
-    k = int(np.floor(0.15 * (len(ppos) + 1)))
-    tc = float(ppos[k - 1])
+    tc, _ = conformal_threshold(pc[y_cal == 1], MAIN_ALPHA)
     pte = xp.predict_proba(X_te)[:, 1]
     ex = json.load(open(MODEL_DIR / "severity_extras.json"))
     assert abs(tc - ex["split"]["threshold"]) < 1e-6, (tc, ex["split"]["threshold"])
@@ -189,7 +172,10 @@ def fig1_roc():
 def fig2_shap():
     import shap
     import joblib
-    model = joblib.load(MODEL_DIR / "triage.pkl")
+    import sys
+    sys.path.insert(0, str(HERE))
+    from triage_models import extract_base
+    model = extract_base(joblib.load(MODEL_DIR / "triage.pkl"))
     feats = json.load(open(MODEL_DIR / "triage_features.json"))
     data = pd.read_csv(HERE / "data" / "processed" / "nhamcs_triage_features.csv")
     X = data.drop(columns=["is_high_severity"])
@@ -224,17 +210,26 @@ def fig3_tradeoff():
 
 # ---------------------------------------------------------------- Fig 4: conformal hist re-plot
 def fig4_conformal_hist():
+    import sys
+    sys.path.insert(0, str(HERE))
+    from conformal_triage import PAC_DELTA
     df = pd.read_csv(MODEL_DIR / "conformal_repeats.csv")
     rec = df["test_recall"].to_numpy()
+    pac = df["pac_test_recall"].to_numpy()
     fig, ax = plt.subplots(figsize=(3.5, 3.0))
-    ax.hist(rec, bins=20, edgecolor="black", color=COLORS["blue"])
-    ax.axvline(0.85, color=COLORS["red"], ls="--", label="target 1-alpha=0.85")
+    ax.hist(rec, bins=20, edgecolor="black", color=COLORS["blue"],
+            alpha=0.55, label="marginal")
+    ax.hist(pac, bins=20, edgecolor="black", color=COLORS["green"],
+            alpha=0.55, label=f"PAC ($\\delta$={PAC_DELTA:.2f})")
+    ax.axvline(0.85, color=COLORS["red"], ls="--", label="target 0.85")
     ax.axvline(rec.mean(), color="black", ls="-",
-               label=f"mean={rec.mean():.4f} (n={len(rec)})")
+               label=f"marginal mean={rec.mean():.3f}")
+    ax.axvline(pac.mean(), color=COLORS["orange"], ls="-",
+               label=f"PAC mean={pac.mean():.3f}")
     ax.set_xlabel("test recall (per split)")
     ax.set_ylabel("splits")
-    ax.set_title("Conformal recall over 200 splits (marginal guarantee)")
-    ax.legend(fontsize=7)
+    ax.set_title("Conformal recall over 200 splits")
+    ax.legend(fontsize=6.5)
     savefig(PAPER_DIR / "paper_fig4_conformal_hist.png")
 
 
@@ -305,18 +300,17 @@ def figS1_forecast():
 
 # ---------------------------------------------------------------- Suppl: calibration re-plot (recompute, assert Brier)
 def figS1b_calibration():
-    from sklearn.model_selection import train_test_split
     from sklearn.metrics import brier_score_loss
     import sys
     sys.path.insert(0, str(HERE))
     from train_triage import load_real
-    from conformal_triage import split_60_20_20, build_pipe, conformal_threshold, MAIN_ALPHA
+    from conformal_triage import split_60_20_20
+    from triage_models import make_estimator, PRIMARY
     data = load_real()
     X = data.drop(columns=["is_high_severity"])
     y = data["is_high_severity"].to_numpy()
     (X_tr, y_tr), (X_cal, y_cal), (X_te, y_te) = split_60_20_20(X, y, 42)
-    neg, pos = np.bincount(y_tr)
-    pipe = build_pipe(float(neg / pos))
+    pipe = make_estimator(PRIMARY)
     pipe.fit(X_tr, y_tr)
     pte = pipe.predict_proba(X_te)[:, 1]
     brier = round(float(brier_score_loss(y_te, pte)), 4)

@@ -108,13 +108,15 @@ def audit_ngrams(text: str):
 
 HONESTY = {
     "marginal guarantee stated": ["marginal", "per-split"],
-    "below-target fraction": ["46", "below"],
+    "below-target fraction disclosed": ["12.5", "below"],
+    "PAC rule improves reliability": ["3.5", "pac"],
     "outbreak descriptive (no invented labels)": ["descriptive", "enrichment"],
-    "overconfidence disclosed": ["overconfident"],
+    "Brier vs constant disclosed": ["brier", "constant"],
     "transfer caveat": ["exchangeab", "transfer"],
     "no synthetic data": ["synthetic"],
     "forecast baselines competitive": ["holt-winters"],
     "NEWS2 baseline reported": ["news2"],
+    "nested cross-fitted thresholds reported": ["cross-fit"],
 }
 
 

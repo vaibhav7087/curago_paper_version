@@ -9,7 +9,14 @@ Raw data (download before running, US public domain, no auth):
 Unzip into ds/data/raw/ (any depth) — inner filename is probed by glob, not hardcoded.
 
 Outputs: models/triage.pkl, models/triage_features.json,
-         models/metric_table.csv, models/shap_summary.png
+         models/metric_table.csv, models/triage_oof_stats.json,
+         models/shap_summary.png
+
+Protocol: manual 5-fold OOF loop (StratifiedKFold, shuffle, seed 42) over the
+candidates in ds/triage_models.py; fold-mean metrics in metric_table.csv
+(incl. Brier and a constant-at-train-prevalence reference row), pooled OOF
+predictions retained for bootstrap AUC CIs. Primary model chosen by the
+pre-declared Brier rule (asserted, fail-closed) and saved as triage.pkl.
 """
 import json
 import joblib
@@ -90,78 +97,77 @@ def prepare_nhamcs(df):
 
 
 def main():
-    from sklearn.model_selection import StratifiedKFold, cross_validate
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.impute import SimpleImputer
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.metrics import make_scorer, recall_score, precision_score, f1_score
-    from xgboost import XGBClassifier
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.metrics import (recall_score, precision_score, f1_score,
+                                 roc_auc_score, brier_score_loss)
+    from triage_models import (CANDIDATES, LABELS, PRIMARY, CALIBRATED,
+                               SELECTION_RULE, make_estimator, extract_base)
 
     data = load_real()
     X = data.drop(columns=["is_high_severity"])
-    y = data["is_high_severity"]
+    y = data["is_high_severity"].to_numpy()
     feature_cols = list(X.columns)
-    print(f"X shape: {X.shape}, y: {y.value_counts().to_dict()}")
-    neg, pos = y.value_counts().values
+    print(f"X shape: {X.shape}, y: {dict(zip(*np.unique(y, return_counts=True)))}")
+    neg, pos = np.bincount(y)
     scale_pos_weight = float(neg / max(1, pos))
-    print(f"scale_pos_weight: {scale_pos_weight:.2f}")
-
-    scoring = {
-        "accuracy": "accuracy",
-        "roc_auc": "roc_auc",
-        "recall": make_scorer(recall_score),
-        "precision": make_scorer(precision_score),
-        "f1": make_scorer(f1_score),
-    }
+    print(f"scale_pos_weight (weighted predecessor): {scale_pos_weight:.2f}")
+    n = len(X)
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-    pipe_lr = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)),
-    ])
-    print("\n=== Logistic Regression (baseline) ===")
-    results_lr = cross_validate(pipe_lr, X, y, cv=cv, scoring=scoring)
-    for m in scoring:
-        v = results_lr[f"test_{m}"]
-        print(f"  {m}: {v.mean():.4f} ± {v.std():.4f}")
+    def fold_metrics(est_name, oof, fold_briers, fold_aucs, fold_rec,
+                     fold_prec, fold_f1):
+        return {
+            "Model": LABELS[est_name],
+            "AUC-ROC": float(np.mean(fold_aucs)),
+            "Recall (Sensitivity)": float(np.mean(fold_rec)),
+            "Precision": float(np.mean(fold_prec)),
+            "F1 Score": float(np.mean(fold_f1)),
+            "Under-Triage Rate": float(1.0 - np.mean(fold_rec)),
+            "Brier (OOF)": float(np.mean(fold_briers)),
+            "Data Source": f"{DATA_SOURCE_LABEL} (n={n})",
+        }
 
-    pipe_xgb = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("clf", XGBClassifier(
-            scale_pos_weight=scale_pos_weight,
-            n_estimators=200, max_depth=6, learning_rate=0.1,
-            random_state=42, eval_metric="logloss",
-        )),
-    ])
-    print("\n=== XGBoost (class-weighted) ===")
-    results_xgb = cross_validate(pipe_xgb, X, y, cv=cv, scoring=scoring)
-    for m in scoring:
-        v = results_xgb[f"test_{m}"]
-        print(f"  {m}: {v.mean():.4f} ± {v.std():.4f}")
+    rows, oof_store = [], {}
+    for name in CANDIDATES:
+        oof = np.zeros(n)
+        briers, aucs, recs, precs, f1s = [], [], [], [], []
+        for tr, te in cv.split(X, y):
+            est = make_estimator(name, scale_pos_weight=scale_pos_weight)
+            est.fit(X.iloc[tr], y[tr])
+            p = est.predict_proba(X.iloc[te])[:, 1]
+            oof[te] = p
+            pred = (p >= 0.5).astype(int)
+            yte = y[te]
+            briers.append(brier_score_loss(yte, p))
+            aucs.append(roc_auc_score(yte, p))
+            recs.append(recall_score(yte, pred, zero_division=0))
+            precs.append(precision_score(yte, pred, zero_division=0))
+            f1s.append(f1_score(yte, pred, zero_division=0))
+        oof_store[name] = oof
+        rows.append(fold_metrics(name, oof, briers, aucs, recs, precs, f1s))
+        print(f"{LABELS[name]}: AUC {rows[-1]['AUC-ROC']:.4f} "
+              f"recall {rows[-1]['Recall (Sensitivity)']:.4f} "
+              f"brier {rows[-1]['Brier (OOF)']:.4f}")
 
-    under_lr = 1 - results_lr["test_recall"].mean()
-    under_xgb = 1 - results_xgb["test_recall"].mean()
-    print(f"\nUnder-triage (LogReg): {under_lr:.4f}")
-    print(f"Under-triage (XGBoost): {under_xgb:.4f}")
+    # Constant-at-train-prevalence reference row (per-fold prevalence -> OOF)
+    oof_c = np.zeros(n)
+    briers, aucs, recs, precs, f1s = [], [], [], [], []
+    for tr, te in cv.split(X, y):
+        pbar = float(y[tr].mean())
+        oof_c[te] = pbar
+        pred = np.zeros(len(te), dtype=int) if pbar < 0.5 else np.ones(len(te), dtype=int)
+        yte = y[te]
+        briers.append(brier_score_loss(yte, np.full(len(te), pbar)))
+        aucs.append(roc_auc_score(yte, np.full(len(te), pbar)))
+        recs.append(recall_score(yte, pred, zero_division=0))
+        precs.append(precision_score(yte, pred, zero_division=0))
+        f1s.append(f1_score(yte, pred, zero_division=0))
+    oof_store["constant"] = oof_c
+    rows.append(fold_metrics("constant", oof_c, briers, aucs, recs, precs, f1s))
+    print(f"Constant (train prevalence): brier {rows[-1]['Brier (OOF)']:.4f} "
+          f"auc {rows[-1]['AUC-ROC']:.4f}")
 
-    pipe_xgb.fit(X, y)
-    joblib.dump(pipe_xgb, MODEL_DIR / "triage.pkl")
-    with open(MODEL_DIR / "triage_features.json", "w") as f:
-        json.dump(feature_cols, f)
-    print("Saved ds/models/triage.pkl + triage_features.json")
-
-    n = len(X)
-    metric_table = pd.DataFrame({
-        "Model": ["Logistic Regression (baseline)", "XGBoost (class-weighted)"],
-        "AUC-ROC": [results_lr["test_roc_auc"].mean(), results_xgb["test_roc_auc"].mean()],
-        "Recall (Sensitivity)": [results_lr["test_recall"].mean(), results_xgb["test_recall"].mean()],
-        "Precision": [results_lr["test_precision"].mean(), results_xgb["test_precision"].mean()],
-        "F1 Score": [results_lr["test_f1"].mean(), results_xgb["test_f1"].mean()],
-        "Under-Triage Rate": [under_lr, under_xgb],
-        "Data Source": [f"{DATA_SOURCE_LABEL} (n={n})", f"{DATA_SOURCE_LABEL} (n={n})"],
-    })
+    metric_table = pd.DataFrame(rows)
     print("\nMETRIC TABLE:")
     try:
         print(metric_table.to_markdown(index=False))
@@ -169,14 +175,78 @@ def main():
         print(metric_table.to_string(index=False))
     metric_table.to_csv(MODEL_DIR / "metric_table.csv", index=False)
 
-    # SHAP with fallback to importance bar
+    # ---- pre-declared primary selection rule (fail-closed) ------------------
+    brier_by_cal = {m: float(metric_table.loc[metric_table.Model == LABELS[m],
+                                              "Brier (OOF)"].iloc[0])
+                    for m in CALIBRATED}
+    rule_winner = min(sorted(brier_by_cal), key=lambda m: brier_by_cal[m])
+    if rule_winner != PRIMARY:
+        raise RuntimeError(
+            f"PRE-DECLARED RULE VIOLATION: rule picks {rule_winner} "
+            f"(Brier {brier_by_cal}), but PRIMARY is locked to {PRIMARY}. "
+            "Update PRIMARY deliberately or investigate the drift."
+        )
+    print(f"Primary selection: {PRIMARY} ({SELECTION_RULE}; "
+          f"Brier {brier_by_cal})")
+
+    # ---- OOF bootstrap AUC CIs (paired, seed 42) ---------------------------
+    rng = np.random.default_rng(42)
+    n_boot = 1000
+    idx_all = np.arange(n)
+
+    def boot_auc(p, idx):
+        return roc_auc_score(y[idx], p[idx])
+
+    ci_store, diff = {}, []
+    for m in ["logreg", PRIMARY]:
+        vals = [boot_auc(oof_store[m], rng.choice(idx_all, n, replace=True))
+                for _ in range(n_boot)]
+        ci_store[m] = [round(float(np.percentile(vals, 2.5)), 4),
+                       round(float(np.percentile(vals, 97.5)), 4)]
+    for _ in range(n_boot):
+        b = rng.choice(idx_all, n, replace=True)
+        diff.append(roc_auc_score(y[b], oof_store[PRIMARY][b])
+                    - roc_auc_score(y[b], oof_store["logreg"][b]))
+    diff_ci = [round(float(np.percentile(diff, 2.5)), 4),
+               round(float(np.percentile(diff, 97.5)), 4)]
+    stats = {
+        "protocol": "5-fold OOF (StratifiedKFold, shuffle, seed 42); "
+                    "bootstrap 1000 resamples of OOF rows, rng 42",
+        "bootstrap_resamples": n_boot,
+        "primary": PRIMARY,
+        "selection_rule": SELECTION_RULE,
+        "selection_brier": {k: round(v, 4) for k, v in brier_by_cal.items()},
+        "selection_chosen": rule_winner,
+        "oof_auc": {k: round(float(roc_auc_score(y, v)), 4)
+                    for k, v in oof_store.items()},
+        "oof_brier": {k: round(float(brier_score_loss(y, v)), 4)
+                      for k, v in oof_store.items()},
+        "auc_ci95": ci_store,
+        "auc_diff_primary_minus_logreg_ci95": diff_ci,
+    }
+    with open(MODEL_DIR / "triage_oof_stats.json", "w") as f:
+        json.dump(stats, f, indent=2, sort_keys=True)
+    print(f"AUC 95% CI: {PRIMARY} {ci_store[PRIMARY]}, logreg {ci_store['logreg']}, "
+          f"diff {diff_ci}")
+
+    # ---- final artifact: primary model fitted on all data -------------------
+    model = make_estimator(PRIMARY, scale_pos_weight=scale_pos_weight)
+    model.fit(X, y)
+    joblib.dump(model, MODEL_DIR / "triage.pkl")
+    with open(MODEL_DIR / "triage_features.json", "w") as f:
+        json.dump(feature_cols, f)
+    print(f"Saved ds/models/triage.pkl ({PRIMARY}) + triage_features.json "
+          "+ triage_oof_stats.json")
+
+    # SHAP on the underlying booster of the primary model (with fallback)
     try:
         import shap
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        X_imp = pipe_xgb.named_steps["imputer"].transform(X)
-        explainer = shap.TreeExplainer(pipe_xgb.named_steps["clf"])
+        base = extract_base(model)
+        X_imp = base.named_steps["imputer"].transform(X)
+        explainer = shap.TreeExplainer(base.named_steps["clf"])
         sv = explainer.shap_values(X_imp[:500])
         plt.figure(figsize=(10, 8))
         shap.summary_plot(sv, X_imp[:500], feature_names=feature_cols, show=False)
@@ -189,7 +259,7 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        imp = pipe_xgb.named_steps["clf"].feature_importances_
+        imp = extract_base(model).named_steps["clf"].feature_importances_
         idx = np.argsort(imp)[-12:][::-1]
         plt.figure(figsize=(10, 6))
         plt.barh([feature_cols[i] for i in idx][::-1], imp[idx][::-1])

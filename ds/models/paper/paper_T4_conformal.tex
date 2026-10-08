@@ -1,17 +1,22 @@
 \begin{table*}[t]
 \centering
-\caption{Split-conformal recall control over 200 random 60$/$20$/$20 splits (XGBoost, calibration quantile on positives). The guarantee is marginal: individual splits vary.}
+\caption{Split-conformal recall control over 200 random 60$/$20$/$20 splits (primary XGBoost$+$isotonic; calibration quantile on positives). Marginal: textbook $k=\lfloor\alpha(n+1)\rfloor$ rule, average guarantee. PAC: Beta order-statistic rank at $\delta$=0.1, bounding the below-target share per split.}
 \label{tab:conformal}
 \begin{adjustbox}{max width=0.98\textwidth}
-\begin{tabular}{lrrrrrrr}
+\begin{tabular}{llrrrrc}
 \toprule
-alpha (miss target) & Mean recall & SD & Min & Max & Frac. splits <0.85 & Mean precision & Data Source \\
+alpha (miss target) & Rule & Mean recall & SD & Frac. below $1-\alpha$ & Mean precision & Data Source \\
 \midrule
-0.05 & 0.953 & 0.015 & 0.911 & 0.983 & 0.0 & 0.171 & CDC NHAMCS 2019 ED (n=13,595) \\
-0.1 & 0.902 & 0.02 & 0.841 & 0.954 & 0.005 & 0.185 & CDC NHAMCS 2019 ED (n=13,595) \\
-0.15 & 0.85 & 0.027 & 0.773 & 0.92 & 0.46 & 0.198 & CDC NHAMCS 2019 ED (n=13,595) \\
-0.2 & 0.8 & 0.029 & 0.729 & 0.877 & 0.97 & 0.211 & CDC NHAMCS 2019 ED (n=13,595) \\
-0.3 & 0.7 & 0.032 & 0.604 & 0.795 & 1.0 & 0.241 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.05 & marginal & 0.966 & 0.015 & 0.145 & 0.169 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.05 & PAC ($\delta$=0.1) & 0.976 & 0.013 & 0.03 & 0.164 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.1 & marginal & 0.924 & 0.023 & 0.155 & 0.183 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.1 & PAC ($\delta$=0.1) & 0.938 & 0.021 & 0.03 & 0.179 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.15 & marginal & 0.884 & 0.033 & 0.125 & 0.196 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.15 & PAC ($\delta$=0.1) & 0.9 & 0.03 & 0.035 & 0.191 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.2 & marginal & 0.832 & 0.038 & 0.22 & 0.212 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.2 & PAC ($\delta$=0.1) & 0.858 & 0.038 & 0.06 & 0.204 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.3 & marginal & 0.737 & 0.043 & 0.175 & 0.243 & CDC NHAMCS 2019 ED (n=13,595) \\
+0.3 & PAC ($\delta$=0.1) & 0.768 & 0.043 & 0.025 & 0.233 & CDC NHAMCS 2019 ED (n=13,595) \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}

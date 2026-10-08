@@ -1,6 +1,6 @@
 # Data and Code Availability Statements
 
-This document provides formal availability statements, licensing terms, provenance records, and exact step-by-step reproduction instructions for the research paper *"Real-Data Machine Learning for Rural Telemedicine Triage and Outbreak Surveillance"*.
+This document provides formal availability statements, licensing terms, provenance records, and exact step-by-step reproduction instructions for the research paper *"Real-Data Machine Learning for Telemedicine Triage and Outbreak Surveillance"*.
 
 ---
 

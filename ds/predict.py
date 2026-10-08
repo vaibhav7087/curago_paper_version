@@ -119,8 +119,9 @@ def predict_severity(patient_data: dict) -> dict:
         # abstention rate at the tuned point is reported in operating_point.json)
         abstain = confidence < 0.60
 
-        # Get feature importances (from the XGBoost model inside the pipeline)
-        clf = model.named_steps['clf']
+        # Get feature importances (base booster inside the calibrated model)
+        from triage_models import extract_base
+        clf = extract_base(model).named_steps["clf"]
         importances = clf.feature_importances_
         top_indices = np.argsort(importances)[-5:][::-1]
         feature_contributions = {

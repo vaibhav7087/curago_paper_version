@@ -1,0 +1,41 @@
+{
+  "auc_ci95": {
+    "logreg": [
+      0.7077,
+      0.7311
+    ],
+    "xgb_unw_isotonic": [
+      0.7284,
+      0.7514
+    ]
+  },
+  "auc_diff_primary_minus_logreg_ci95": [
+    0.0117,
+    0.0307
+  ],
+  "bootstrap_resamples": 1000,
+  "oof_auc": {
+    "constant": 0.5,
+    "logreg": 0.7189,
+    "xgb_unw": 0.7424,
+    "xgb_unw_isotonic": 0.7402,
+    "xgb_unw_platt": 0.7423,
+    "xgb_weighted": 0.732
+  },
+  "oof_brier": {
+    "constant": 0.1291,
+    "logreg": 0.2086,
+    "xgb_unw": 0.1132,
+    "xgb_unw_isotonic": 0.1128,
+    "xgb_unw_platt": 0.1135,
+    "xgb_weighted": 0.1646
+  },
+  "primary": "xgb_unw_isotonic",
+  "protocol": "5-fold OOF (StratifiedKFold, shuffle, seed 42); bootstrap 1000 resamples of OOF rows, rng 42",
+  "selection_brier": {
+    "xgb_unw_isotonic": 0.1128,
+    "xgb_unw_platt": 0.1135
+  },
+  "selection_chosen": "xgb_unw_isotonic",
+  "selection_rule": "min 5-fold OOF Brier among {isotonic, Platt}; ties -> isotonic"
+}

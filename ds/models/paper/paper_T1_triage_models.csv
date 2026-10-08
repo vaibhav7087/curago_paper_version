@@ -1,3 +1,7 @@
-Model,AUC,Recall,Precision,F1,Under-triage,Data Source
-Logistic Regression (baseline),0.719,0.609,0.269,0.373,0.391,CDC NHAMCS 2019 ED
-XGBoost (class-weighted),0.732,0.513,0.334,0.405,0.487,CDC NHAMCS 2019 ED
+Model,AUC,Recall,Precision,F1,Under-triage,Brier,Data Source
+Logistic Regression (baseline),0.719,0.609,0.269,0.373,0.391,0.209,CDC NHAMCS 2019 ED
+XGBoost (class-weighted),0.732,0.513,0.334,0.405,0.487,0.165,CDC NHAMCS 2019 ED
+XGBoost (unweighted),0.743,0.188,0.571,0.283,0.812,0.113,CDC NHAMCS 2019 ED
+XGBoost (unweighted + isotonic),0.742,0.141,0.606,0.227,0.859,0.113,CDC NHAMCS 2019 ED
+XGBoost (unweighted + Platt),0.743,0.158,0.593,0.249,0.842,0.113,CDC NHAMCS 2019 ED
+Constant (train prevalence),0.5,0.0,0.0,0.0,1.0,0.129,CDC NHAMCS 2019 ED

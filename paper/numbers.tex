@@ -8,59 +8,121 @@
 % source: module1_triage.prevalence
 \newcommand{\Prev}{0.152}
 % source: module1_triage.auc_xgb_cv
-\newcommand{\AUCxgb}{0.732}
+\newcommand{\AUCxgb}{0.742}
+% source: module1_triage.auc_xgb_weighted_cv
+\newcommand{\AUCWeighted}{0.732}
 % source: module1_triage.auc_logreg_cv
 \newcommand{\AUClogreg}{0.719}
+% source: module1_triage.auc_xgb_ci95.0
+\newcommand{\AUCxgbCIlo}{0.728}
+% source: module1_triage.auc_xgb_ci95.1
+\newcommand{\AUCxgbCIhi}{0.751}
+% source: module1_triage.auc_logreg_ci95.0
+\newcommand{\AUClogregCIlo}{0.708}
+% source: module1_triage.auc_logreg_ci95.1
+\newcommand{\AUClogregCIhi}{0.731}
+% source: module1_triage.auc_diff_ci95.0
+\newcommand{\AUCdiffLo}{0.012}
+% source: module1_triage.auc_diff_ci95.1
+\newcommand{\AUCdiffHi}{0.031}
 % source: module1_triage.xgb_cv_t05_recall
-\newcommand{\RecallT}{0.513}
+\newcommand{\RecallT}{0.141}
 % source: module1_triage.xgb_cv_t05_under_triage
-\newcommand{\UnderT}{0.487}
+\newcommand{\UnderT}{0.859}
+% source: module1_triage.xgb_cv_t05_fpr
+\newcommand{\FPRDefault}{0.016}
 % source: module1_triage.tuned_xgb_threshold
-\newcommand{\TunedT}{0.25}
+\newcommand{\TunedT}{0.11}
 % source: module1_triage.tuned_xgb_recall
-\newcommand{\TunedRecall}{0.845}
+\newcommand{\TunedRecall}{0.8}
 % source: module1_triage.tuned_xgb_precision
-\newcommand{\TunedPrec}{0.207}
+\newcommand{\TunedPrec}{0.226}
+% source: module1_triage.tuned_xgb_fpr
+\newcommand{\FPRTuned}{0.493}
 % source: module1_triage.tuned_xgb_under_triage
-\newcommand{\TunedUnder}{0.155}
+\newcommand{\TunedUnder}{0.2}
 % source: module1_triage.tuned_xgb_abstention
-\newcommand{\TunedAbst}{0.235}
+\newcommand{\TunedAbst}{0.042}
+% source: module1_triage.nested_recall
+\newcommand{\NestedRecall}{0.829}
+% source: module1_triage.nested_precision
+\newcommand{\NestedPrec}{0.214}
+% source: module1_triage.nested_fpr
+\newcommand{\FPRNested}{0.545}
+% source: module1_triage.nested_abstention
+\newcommand{\NestedAbst}{0.042}
+% source: module1_triage.nested_threshold_mean
+\newcommand{\NestedTmean}{0.096}
+% source: module1_triage.nested_threshold_min
+\newcommand{\NestedTmin}{0.09}
+% source: module1_triage.nested_threshold_max
+\newcommand{\NestedTmax}{0.1}
+% source: module1_triage.brier_primary_oof
+\newcommand{\CalBrier}{0.113}
+% source: module1_triage.brier_isotonic_oof
+\newcommand{\CalIsoBrier}{0.1128}
+% source: module1_triage.brier_platt_oof
+\newcommand{\CalPlattBrier}{0.1135}
+% source: module1_triage.brier_weighted_oof
+\newcommand{\BrierWeighted}{0.165}
+% source: module1_triage.seed42_brier_constant
+\newcommand{\BrierConst}{0.129}
 % source: module1_triage.xgb_cv_t05_under_triage
-\newcommand{\UnderTPct}{48.7}
+\newcommand{\UnderTPct}{85.9}
 % source: module1_triage.tuned_xgb_under_triage
-\newcommand{\TunedUnderPct}{15.5}
+\newcommand{\TunedUnderPct}{20.0}
+% source: module1_triage.nested_under_triage
+\newcommand{\NestedUnderPct}{17.2}
 % source: module1_triage.conformal_alpha
 \newcommand{\AlphaC}{0.15}
 % source: module1_triage.conformal_mean_recall
-\newcommand{\CMeanR}{0.850}
+\newcommand{\CMeanR}{0.884}
 % source: module1_triage.conformal_sd_recall
-\newcommand{\CSdR}{0.027}
+\newcommand{\CSdR}{0.033}
 % source: module1_triage.conformal_frac_below_085
-\newcommand{\CBelow}{0.46}
+\newcommand{\CBelow}{0.125}
 % source: module1_triage.conformal_frac_below_085
-\newcommand{\CBelowPct}{46}
+\newcommand{\CBelowPct}{12.5}
 % source: module1_triage.conformal_mean_threshold
-\newcommand{\CMeanT}{0.212}
+\newcommand{\CMeanT}{0.094}
 % source: module1_triage.conformal_mean_abstention
-\newcommand{\CMeanA}{0.218}
+\newcommand{\CMeanA}{0.043}
+% source: module1_triage.conformal_mean_precision
+\newcommand{\CMeanPrec}{0.196}
 % source: module1_triage.conformal_n_seeds
 \newcommand{\CNseeds}{200}
+% source: module1_triage.pac_delta
+\newcommand{\PacDelta}{0.1}
+% source: module1_triage.pac_delta
+\newcommand{\PacDeltaPct}{10}
+% source: module1_triage.pac_mean_recall
+\newcommand{\PacMeanR}{0.900}
+% source: module1_triage.pac_sd_recall
+\newcommand{\PacSdR}{0.030}
+% source: module1_triage.pac_frac_below_085
+\newcommand{\PacBelowPct}{3.5}
+% source: module1_triage.pac_mean_precision
+\newcommand{\PacMeanP}{0.191}
+% source: module1_triage.pac_mean_threshold
+\newcommand{\PacMeanT}{0.089}
 % source: module1_triage.seed42_threshold
-\newcommand{\SdT}{0.173}
+\newcommand{\SdT}{0.099}
 % source: module1_triage.seed42_recall
-\newcommand{\SdR}{0.913}
+\newcommand{\SdR}{0.886}
 % source: module1_triage.seed42_recall_ci95.0
-\newcommand{\SdCIlo}{0.886}
+\newcommand{\SdCIlo}{0.856}
 % source: module1_triage.seed42_recall_ci95.1
-\newcommand{\SdCIhi}{0.94}
+\newcommand{\SdCIhi}{0.914}
 % source: module1_triage.seed42_precision
-\newcommand{\SdP}{0.187}
+\newcommand{\SdP}{0.199}
+% source: module1_triage.seed42_fpr
+\newcommand{\FPRConf}{0.643}
 % source: module1_triage.seed42_auc
-\newcommand{\SdAUC}{0.739}
+\newcommand{\SdAUC}{0.755}
 % source: module1_triage.seed42_abstention
-\newcommand{\SdAbst}{0.231}
+\newcommand{\SdAbst}{0.036}
 % source: module1_triage.seed42_brier
-\newcommand{\SdBrier}{0.158}
+\newcommand{\SdBrier}{0.112}
 % source: module1_triage.news2_cutoff5_recall
 \newcommand{\NewsAtFiveR}{0.138}
 % source: module1_triage.news2_cutoff5_precision
