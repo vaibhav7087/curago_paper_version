@@ -28,3 +28,17 @@ paper/*.blg
 paper/*.synctex.gz
 paper/*.fls
 paper/*.fdb_latexmk
+node_modules/
+build/
+.next/
+dist/
+.cache/
+*.pem
+*.key
+id_rsa
+id_ed25519
+.opencode/
+.huggingface/
+*.csd
+*.apk
+*.so
